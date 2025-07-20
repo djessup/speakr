@@ -1,0 +1,14 @@
+# devenv.yaml - Project composition and imports
+inputs:
+  nixpkgs:
+    url: github:NixOS/nixpkgs/nixpkgs-unstable
+
+  # Rust overlay for latest versions
+  rust-overlay:
+    url: github:oxalica/rust-overlay
+    inputs:
+      nixpkgs:
+        follows: nixpkgs
+
+# Allow unfree packages (for some development tools)
+allowUnfree: true

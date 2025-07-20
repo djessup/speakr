@@ -1,0 +1,51 @@
+# Pre-commit hooks configuration
+# Install with: pre-commit install
+# Run manually: pre-commit run --all-files
+
+repos:
+  # Rust-specific hooks (local)
+  - repo: local
+    hooks:
+      - id: cargo-fmt
+        name: Cargo Format
+        entry: cargo fmt --all --check
+        language: system
+        files: \.rs$
+        pass_filenames: false
+
+      - id: cargo-clippy
+        name: Cargo Clippy
+        entry: cargo clippy --all-targets --all-features -- -D warnings
+        language: system
+        files: \.rs$
+        pass_filenames: false
+
+      - id: cargo-test
+        name: Cargo Test
+        entry: cargo test --all
+        language: system
+        files: \.rs$
+        pass_filenames: false
+
+  # General code quality hooks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+      - id: check-yaml
+        args: ["--unsafe"] # Allow custom YAML tags
+      - id: check-added-large-files
+        args: ["--maxkb=1000"]
+        exclude: docs/theme/mermaid.min.js
+      - id: check-merge-conflict
+      - id: check-json
+      - id: check-toml
+      - id: mixed-line-ending
+        args: ["--fix=lf"]
+
+  # Additional hooks for documentation
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.37.0
+    hooks:
+      - id: markdownlint-fix
+        args: ["--config", ".markdownlint.json"]
