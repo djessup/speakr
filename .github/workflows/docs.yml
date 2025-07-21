@@ -1,6 +1,7 @@
-name: Documentation Site
+name: Deploy mdBook documentation to Pages
 
 on:
+  # Runs on pushes targeting the default branch touching docs/ or the workflow file
   push:
     branches: [main]
     paths:
@@ -8,21 +9,27 @@ on:
       - ".github/workflows/docs.yml"
   workflow_dispatch:
 
+# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
 permissions:
   contents: read
   pages: write
   id-token: write
-
-# Disallow concurrent deployment
+  
+# Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
+# However, do NOT cancel in-progress runs as we want to allow these production deployments to complete.
 concurrency:
   group: "pages"
   cancel-in-progress: false
 
 jobs:
-  docs:
+  # Build
+  build-docs:
     runs-on: macos-latest
-    steps:
 
+    env:
+      MDBOOK_VERSION: 0.4.52
+      
+    steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -40,16 +47,31 @@ jobs:
         run: nix profile install nixpkgs#devenv
 
       - name: Setup Pages
+        id: pages
         uses: actions/configure-pages@v5
 
-      - name: Build documentation
+      - name: Build documentation with mdBook
         run: devenv shell docs-build
+        # run: mdbook build
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: book
+          path: ./book
 
+  # Deploy
+  deploy-docs:
+    runs-on: ubuntu-latest
+    
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    
+    needs: build-docs
+    
+    steps:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+
