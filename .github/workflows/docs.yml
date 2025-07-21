@@ -20,29 +20,35 @@ concurrency:
 
 jobs:
   docs:
-    runs-on: ubuntu-latest
-
+    runs-on: macos-latest
     steps:
+      
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v26
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup devenv cache
+        uses: cachix/cachix-action@v14
+        with:
+          name: devenv
+
+      - name: Install devenv.sh
+        run: nix profile install nixpkgs#devenv
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
-      - name: Update Rust toolchain
-        run: rustup update
-
-      - name: Install mdbook and plugins
-        uses: ./.github/workflows/install-mdbook
-
       - name: Build documentation
-        working-directory: docs
-        run: mdbook build
+        run: devenv shell docs-build
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: docs/book
+          path: book
 
       - name: Deploy to GitHub Pages
         id: deployment

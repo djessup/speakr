@@ -63,7 +63,7 @@ Key points:
 | Layer    | Crate / Path              | Main Responsibilities                                                             |
 | -------- | ------------------------- | --------------------------------------------------------------------------------- |
 | Core     | `speakr-core/`            | Record audio (cpal) ➜ transcribe (whisper-rs) ➜ inject text (enigo)               |
-| Backend  | `speakr-tauri/src-tauri/` | Registers global hot-key, exposes `#[tauri::command]` wrappers, persists settings |
+| Backend  | `speakr-tauri/`    | Registers global hot-key, exposes `#[tauri::command]` wrappers, persists settings |
 | Frontend | `speakr-ui/` (optional)   | Leptos WASM UI for tray, preferences, status overlay                              |
 | Assets   | `models/`                 | GGUF Whisper models downloaded post-install                                       |
 

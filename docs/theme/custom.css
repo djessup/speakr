@@ -1,16 +1,4 @@
 :root {
-  --primary: #4f46e5; /* Indigo 600 */
+  --links: #4f46e5; /* Indigo 600 */
   --sidebar-background: #f8fafc;
-}
-
-.navbar {
-  background-color: var(--primary);
-}
-
-.sidebar {
-  background-color: var(--sidebar-background);
-}
-
-a {
-  color: var(--primary);
 }

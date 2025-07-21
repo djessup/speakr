@@ -10,9 +10,9 @@ approach defined in the specification set under `docs/specs/`.
 Reference: [INIT-01 Project Scaffold](specs/INIT-01-project-scaffold.md)
 
 1. Execute the migration steps to create the Cargo workspace (`speakr-core`, `speakr-tauri`,
-2. optional `speakr-ui`).
-3. Commit and open a draft PR; CI should fail until tests are added.
-4. Add baseline CI workflows (lint, build, placeholder tests) that currently fail.
+   optional `speakr-ui`).
+2. Commit and open a draft PR; CI should fail until tests are added.
+3. Add baseline CI workflows (lint, build, placeholder tests) that currently fail.
 
 ## 2. Core Library (`speakr-core`)
 

@@ -12,8 +12,8 @@ build-dir = "book"
 default-theme = "light"
 preferred-dark-theme = "ayu"
 git-repository-url = "https://github.com/djessup/speakr"
-additional-css = ["theme/custom.css", "theme/mdbook-admonish.css", "/Users/jessup/Documents/GitHub/side-proj/speakr/docs/theme/mdbook-admonish.css"]
-additional-js = ["theme/mermaid.min.js", "theme/mermaid-init.js"]
+additional-css = ["docs/theme/custom.css", "docs/theme/mdbook-admonish.css"]
+additional-js = ["docs/theme/mermaid.min.js", "docs/theme/mermaid-init.js"]
 
 [output.html.search]
 use-boolean-and = true
