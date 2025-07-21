@@ -1,0 +1,9 @@
+[package]
+name = "speakr-core"
+version = "0.1.0"
+edition = "2021"
+description = "Core library for the Speakr voice-to-text pipeline."
+
+[dependencies]
+cpal = "0.15.3"
+thiserror = "2.0.12"

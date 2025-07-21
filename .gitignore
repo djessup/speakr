@@ -1,7 +1,7 @@
-/dist/
-/target/
-/Cargo.lock
-docs/_*
+# Build artifacts
+dist/
+dist-test/
+target/
 
 # Development environment files
 .env
@@ -32,5 +32,9 @@ Thumbs.db
 *.temp
 *~
 
+# Cursor
 .cursor/*
 !.cursor/rules/
+
+# Cargo/Rust
+Cargo.lock

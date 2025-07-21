@@ -16,7 +16,7 @@
   env = {
     PROJECT_NAME = "speakr";
     RUST_BACKTRACE = "1";
-    RUST_LOG = "debug";
+    RUST_LOG = "info";
     # Tauri development
     TAURI_SKIP_DEVSERVER_CHECK = "true";
     # Frontend development
@@ -77,12 +77,12 @@
   # Development scripts
   scripts = {
     # Frontend development
-    dev-ui.exec = "trunk serve --port 1420 --open";
-    build-ui.exec = "trunk build --release";
+    dev-ui.exec = "cd $DEVENV_ROOT/speakr-ui && trunk serve --port 1420 --open";
+    build-ui.exec = "cd $DEVENV_ROOT/speakr-ui && trunk build --release";
 
     # Tauri development
-    dev-tauri.exec = "cd $DEVENV_ROOT/src-tauri && cargo tauri dev";
-    build-tauri.exec = "cd $DEVENV_ROOT/src-tauri && cargo tauri build";
+    dev-tauri.exec = "cd $DEVENV_ROOT/speakr-tauri && cargo tauri dev";
+    build-tauri.exec = "cd $DEVENV_ROOT/speakr-tauri && cargo tauri build";
 
     # Full application
     dev.exec = "cd $DEVENV_ROOT && cargo tauri dev";
@@ -134,21 +134,36 @@
   enterShell = ''
     echo "🦀 Welcome to ${config.env.PROJECT_NAME} development environment!"
     echo ""
-    echo "📦 Available tools:"
-    echo "  • Rust $(rustc --version)"
-    echo "  • Trunk $(trunk --version)"
-    echo "  • Tauri CLI $(cargo tauri --version 2>/dev/null || echo 'not installed')"
-    echo "  • mdbook $(mdbook --version)"
+    echo "==== 📦 Toolchain ================================================="
+    echo "     Rust $(rustc --version)"
+    echo "     Trunk $(trunk --version)"
+    echo "     Tauri CLI $(cargo tauri --version 2>/dev/null || echo 'not installed')"
+    echo "     mdbook $(mdbook --version)"
     echo ""
-    echo "🚀 Available scripts:"
-    echo "  • dev          - Start full Tauri development server"
-    echo "  • dev-ui       - Start frontend only (Trunk serve)"
-    echo "  • dev-tauri    - Start Tauri development server"
-    echo "  • build        - Build production application"
-    echo "  • docs-serve   - Start documentation server"
-    echo "  • format       - Format all code"
-    echo "  • lint         - Run clippy linter"
-    echo "  • test         - Run all tests"
+    echo ""
+    echo "==== 🚀 Run ======================================================="
+    echo "     dev                   - Start full Tauri development server"
+    echo "     dev-ui                - Start frontend only (Trunk serve)"
+    echo "     dev-tauri             - Start Tauri development server"
+    echo ""
+    echo "==== 🔨 Build ====================================================="
+    echo "     build                 - Build production application"
+    echo "     build-ui              - Build frontend (Trunk build --release)"
+    echo "     build-tauri           - Build Tauri application"
+    echo ""
+    echo "==== 📖 Docs ======================================================"
+    echo "     docs-serve            - Start documentation server"
+    echo "     docs-build            - Build documentation"
+    echo "     docs-watch            - Watch documentation and rebuild on changes"
+    echo "     docs-install-plugins  - Install mdbook plugins"
+    echo ""
+    echo "==== 🧰 Utils ====================================================="
+    echo "     format                - Format all code"
+    echo "     lint                  - Run clippy linter"
+    echo "     test                  - Run all tests"
+    echo "     audit                 - Run cargo audit"
+    echo "     update-deps           - Update Rust dependencies"
+    echo "     pre-commit-run        - Run all pre-commit hooks"
     echo ""
     echo "🔧 Setup steps (run once):"
     echo "  1. pre-commit-install  - Install git hooks"

@@ -4,10 +4,16 @@
   "version": "0.1.0",
   "identifier": "com.jessup.speakr",
   "build": {
-    "beforeDevCommand": "trunk serve",
+    "beforeDevCommand": {
+      "cwd": "../speakr-ui",
+      "script": "trunk serve"
+    },
     "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "trunk build",
-    "frontendDist": "../dist"
+    "beforeBuildCommand": {
+      "cwd": "../speakr-ui",
+      "script": "trunk build"
+    },
+    "frontendDist": "../speakr-ui/dist"
   },
   "app": {
     "withGlobalTauri": true,

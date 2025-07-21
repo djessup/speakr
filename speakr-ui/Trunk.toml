@@ -2,8 +2,9 @@
 target = "./index.html"
 
 [watch]
-ignore = ["./src-tauri"]
+ignore = ["../speakr-tauri"]
 
 [serve]
 port = 1420
 open = false
+ws_protocol = "ws"
