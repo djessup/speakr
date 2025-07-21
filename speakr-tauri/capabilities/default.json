@@ -3,8 +3,18 @@
   "identifier": "default",
   "description": "Capability for the main window",
   "windows": ["main"],
+  "platforms": ["macOS"],
   "permissions": [
     "core:default",
-    "opener:default"
+    "opener:default",
+    "global-shortcut:allow-is-registered",
+    "global-shortcut:allow-register",
+    "global-shortcut:allow-register-all",
+    "global-shortcut:allow-unregister",
+    "global-shortcut:allow-unregister-all",
+    "core:app:allow-name",
+    "core:app:allow-version",
+    "core:event:allow-emit",
+    "core:event:allow-listen"
   ]
 }

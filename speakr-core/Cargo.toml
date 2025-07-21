@@ -5,5 +5,24 @@ edition = "2021"
 description = "Core library for the Speakr voice-to-text pipeline."
 
 [dependencies]
+# Audio capture for 16kHz mono streams
 cpal = "0.15.3"
+# Error handling with custom types
 thiserror = "2.0.12"
+# Structured logging instead of println!
+tracing = "0.1.40"
+# Async runtime for audio operations
+tokio = { version = "1.40", features = [
+    "rt-multi-thread",
+    "time",
+    "sync",
+    "macros",
+] }
+
+[dev-dependencies]
+# Async testing support
+tokio-test = "0.4.4"
+# Property-based testing
+proptest = "1.4.0"
+# Test utilities for audio streams
+mockall = "0.12.1"

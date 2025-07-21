@@ -3,6 +3,8 @@ use leptos::{ev::SubmitEvent, prelude::*};
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
+use crate::settings::SettingsPanel;
+
 #[wasm_bindgen]
 extern "C" {
     #[wasm_bindgen(js_namespace = ["window", "__TAURI__", "core"])]
@@ -14,8 +16,11 @@ struct GreetArgs<'a> {
     name: &'a str,
 }
 
+/// Main application view with navigation between main and settings views.
 #[component]
 pub fn App() -> impl IntoView {
+    // State for switching between main view and settings
+    let (current_view, set_current_view) = signal("main");
     let (name, set_name) = signal(String::new());
     let (greet_msg, set_greet_msg) = signal(String::new());
 
@@ -40,7 +45,34 @@ pub fn App() -> impl IntoView {
     };
 
     view! {
-        <main class="container">
+        <div class="app">
+            // Navigation bar
+            <nav class="nav-bar">
+                <div class="nav-buttons">
+                    <button
+                        class={move || if current_view.get() == "main" { "nav-btn active" } else { "nav-btn" }}
+                        on:click=move |_| set_current_view.set("main")
+                    >
+                        "Main"
+                    </button>
+                    <button
+                        class={move || if current_view.get() == "settings" { "nav-btn active" } else { "nav-btn" }}
+                        on:click=move |_| set_current_view.set("settings")
+                    >
+                        "Settings"
+                    </button>
+                </div>
+            </nav>
+
+            // Main content area
+            <main class="main-content">
+                {move || {
+                    let view = current_view.get();
+                    if view == "settings" {
+                        view! { <SettingsPanel /> }.into_any()
+                    } else {
+                        view! {
+                            <div class="container">
             <h1>"Welcome to Tauri + Leptos"</h1>
 
             <div class="row">
@@ -62,6 +94,11 @@ pub fn App() -> impl IntoView {
                 <button type="submit">"Greet"</button>
             </form>
             <p>{ move || greet_msg.get() }</p>
+                            </div>
+                        }.into_any()
+                    }
+                }}
         </main>
+        </div>
     }
 }

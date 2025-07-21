@@ -20,7 +20,15 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 tauri = { version = "2", features = [] }
 tauri-plugin-opener = "2"
+tauri-plugin-global-shortcut = "2"               # Global hot-key registration support
+thiserror = "1.0"                                # Error handling for hot-key operations
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-speakr-core = { path = "../speakr-core" }
+dirs = "5.0"                                     # Cross-platform directory access
 
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+tempfile = "3.0"                                                    # Temporary directories for testing
+
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-global-shortcut = "2"
