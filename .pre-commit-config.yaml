@@ -3,28 +3,96 @@
 # Run manually: pre-commit run --all-files
 
 repos:
-  # Rust-specific hooks (local)
+  # Rust-specific hooks (local) - optimized for affected packages
   - repo: local
     hooks:
-      - id: cargo-fmt
-        name: Cargo Format
+      # Core package hooks (only run when speakr-core files change)
+      - id: cargo-fmt-core
+        name: Cargo Format (speakr-core)
+        entry: cargo fmt --package speakr-core --check
+        language: system
+        files: ^speakr-core/.*\.rs$
+        pass_filenames: false
+
+      - id: cargo-clippy-core
+        name: Cargo Clippy (speakr-core)
+        entry: cargo clippy --package speakr-core --all-targets --all-features -- -D warnings
+        language: system
+        files: ^speakr-core/.*\.rs$
+        pass_filenames: false
+
+      - id: cargo-test-core
+        name: Cargo Test (speakr-core)
+        entry: cargo test --package speakr-core
+        language: system
+        files: ^speakr-core/.*\.rs$
+        pass_filenames: false
+
+      # Tauri package hooks (only run when speakr-tauri files change)
+      - id: cargo-fmt-tauri
+        name: Cargo Format (speakr-tauri)
+        entry: cargo fmt --package speakr-tauri --check
+        language: system
+        files: ^speakr-tauri/.*\.rs$
+        pass_filenames: false
+
+      - id: cargo-clippy-tauri
+        name: Cargo Clippy (speakr-tauri)
+        entry: cargo clippy --package speakr-tauri --all-targets --all-features -- -D warnings
+        language: system
+        files: ^speakr-tauri/.*\.rs$
+        pass_filenames: false
+
+      - id: cargo-test-tauri
+        name: Cargo Test (speakr-tauri)
+        entry: cargo test --package speakr-tauri
+        language: system
+        files: ^speakr-tauri/.*\.rs$
+        pass_filenames: false
+
+      # UI package hooks (only run when speakr-ui files change)
+      - id: cargo-fmt-ui
+        name: Cargo Format (speakr-ui)
+        entry: cargo fmt --package speakr-ui --check
+        language: system
+        files: ^speakr-ui/.*\.rs$
+        pass_filenames: false
+
+      - id: cargo-clippy-ui
+        name: Cargo Clippy (speakr-ui)
+        entry: cargo clippy --package speakr-ui --all-targets --all-features -- -D warnings
+        language: system
+        files: ^speakr-ui/.*\.rs$
+        pass_filenames: false
+
+      - id: cargo-test-ui
+        name: Cargo Test (speakr-ui)
+        entry: cargo test --package speakr-ui
+        language: system
+        files: ^speakr-ui/.*\.rs$
+        pass_filenames: false
+
+      # Workspace-wide hooks (run when workspace files change)
+      - id: cargo-fmt-workspace
+        name: Cargo Format (workspace files)
         entry: cargo fmt --all --check
         language: system
-        files: \.rs$
+        files: ^(Cargo\.(toml|lock)|\.cargo/.*)$
         pass_filenames: false
 
-      - id: cargo-clippy
-        name: Cargo Clippy
-        entry: cargo clippy --all-targets --all-features -- -D warnings
+      - id: cargo-clippy-workspace
+        name: Cargo Clippy (workspace check)
+        entry: cargo clippy --workspace --all-targets --all-features -- -D warnings
         language: system
-        files: \.rs$
+        files: ^(Cargo\.(toml|lock)|\.cargo/.*)$
         pass_filenames: false
 
-      - id: cargo-test
-        name: Cargo Test
-        entry: cargo test --all
+      # Integration tests (run when core changes, as tauri depends on core)
+      - id: cargo-test-integration
+        name: Cargo Test (integration - core affects tauri)
+        entry: cargo test --package speakr-tauri
         language: system
-        files: \.rs$
+        files: ^speakr-core/.*\.rs$
         pass_filenames: false
 
   # General code quality hooks

@@ -10,3 +10,7 @@
 
 - [System Architecture](ARCHITECTURE.md)
 - [System Description](SYSTEM_DESCRIPTION.md)
+
+## Development
+
+- [Pre-commit Setup & Optimization](PRE_COMMIT.md)
