@@ -71,6 +71,7 @@ in
     eza # Better ls with colors
     fzf # Fuzzy finder
     pre-commit # Pre-commit hooks
+    markdownlint-cli # Markdown linter
     # direnv # Directory-based environments
   ];
 

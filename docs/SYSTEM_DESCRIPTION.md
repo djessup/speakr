@@ -1,6 +1,8 @@
 # Speakr – A Local Dictation Hot-Key Utility (Rust + Tauri + Leptos)
 
-A tiny, **privacy-first** macOS desktop app that listens for a global hot-key, records a short audio clip, transcribes it locally with Whisper, then **types** the text into whatever field currently has focus.  Everything runs on-device; no cloud calls, no Electron bloat.
+A tiny, **privacy-first** macOS desktop app that listens for a global hot-key, records a short audio
+clip, transcribes it locally with Whisper, then **types** the text into whatever field currently has
+focus. Everything runs on-device; no cloud calls, no Electron bloat.
 
 ---
 
@@ -21,7 +23,9 @@ A tiny, **privacy-first** macOS desktop app that listens for a global hot-key, r
 │ 3. Text inject    – **enigo** (synthetic keys)     │
 └────────────────────────────────────────────────────┘
 ```
-*Global shortcut*, *audio*, and *keystroke injection* all live in the backend so Speakr continues to work when the UI window is hidden.
+
+*Global shortcut*, *audio*, and *keystroke injection* all live in the backend so Speakr continues to
+work when the UI window is hidden.
 
 ---
 
@@ -36,7 +40,8 @@ A tiny, **privacy-first** macOS desktop app that listens for a global hot-key, r
 | UI                  | `leptos = "0.6"` + `trunk`           | All-Rust reactive UI compiled to WASM                   |
 | Async runtime       | `tokio = "1"` (multi-thread)         | Needed for non-blocking recording & transcription       |
 
-> Tip Quantised **small.en.gguf (~30 MB)** loads in ≈ 2 s on Apple Silicon and is usually accurate enough for notes & code comments.
+> Tip Quantised **small.en.gguf (~30 MB)** loads in ≈ 2 s on Apple Silicon and is usually accurate
+> enough for notes & code comments.
 
 ---
 
@@ -49,6 +54,7 @@ A tiny, **privacy-first** macOS desktop app that listens for a global hot-key, r
 ├─ speakr-ui          # Leptos front-end (optional window)
 └─ models/ggml-small.en.gguf  # user-downloaded Whisper model
 ```
+
 Use a Cargo workspace so all three crates share versions and CI.
 
 ---
@@ -56,12 +62,14 @@ Use a Cargo workspace so all three crates share versions and CI.
 ## 4. Bootstrapping
 
 ### 4.1 Prerequisites
+
 * Rust 1.88.0 + (stable)
 * Node 18 + & pnpm/yarn/npm (for Tauri/Trunk helpers)
 * Xcode Command-Line Tools (macOS)
 * Download a GGUF Whisper model → `models/ggml-small.en.gguf`
 
 ### 4.2 Create the workspace
+
 ```bash
 cargo new --lib speakr-core
 cargo tauri init --template leptos speakr-tauri   # generates src-tauri + Leptos wiring
@@ -79,7 +87,7 @@ pnpm tauri add global-shortcut                     # JavaScript guest bindings
 <summary>Cargo.toml</summary>
 
 ```toml
-[package]            
+[package]
 name    = "speakr-core"
 version = "0.1.0"
 edition = "2021"
@@ -91,6 +99,7 @@ enigo       = "0.1"
 tokio       = { version = "1", features = ["rt-multi-thread", "macros"] }
 anyhow      = "1"
 ```
+
 </details>
 
 ```rust
@@ -161,6 +170,7 @@ tauri-plugin-global-shortcut = "2"
 tokio       = "1"
 anyhow      = "1"
 ```
+
 </details>
 
 ```rust
@@ -207,11 +217,13 @@ fn main() {
 }
 ```
 
-> **Capability JSON** Add `global-shortcut:allow-register` to `src-tauri/capabilities/default.json` (see Tauri docs for full schema).
+> **Capability JSON** Add `global-shortcut:allow-register` to `src-tauri/capabilities/default.json`
+> (see Tauri docs for full schema).
 
 ---
 
 ## 7. Leptos Front-End (optional)
+
 The Tauri template already wires Trunk + Leptos.  A minimal status UI:
 
 ```rust
@@ -238,7 +250,9 @@ pub fn App() -> impl IntoView {
     }
 }
 ```
+
 `tauri.conf.json` should already contain:
+
 ```json
 {
   "build": {
@@ -254,9 +268,12 @@ pub fn App() -> impl IntoView {
 ---
 
 ## 8. macOS Permissions
+
 1. **Microphone** – Tauri adds `NSMicrophoneUsageDescription` automatically when you enable audio.
-2. **Accessibility** – Ask the user to enable Speakr under *System Settings → Privacy & Security → Accessibility* so Enigo keystrokes reach other apps.
+2. **Accessibility** – Ask the user to enable Speakr under *System Settings → Privacy & Security →*
+   *Accessibility* so Enigo keystrokes reach other apps.
 3. **Codesign & Notarise** – For distribution run:
+
 ```bash
 cargo tauri build --target universal-apple-darwin   # produces .app bundle
 # then codesign & notarise with `xcrun notarytool`
@@ -265,6 +282,7 @@ cargo tauri build --target universal-apple-darwin   # produces .app bundle
 ---
 
 ## 9. Dev & Release Workflow
+
 ```bash
 # hot-reload UI + backend
 trunk serve &              # terminal 1 – WASM
@@ -278,6 +296,7 @@ cargo tauri build          # build .app or MSI/DEB
 ---
 
 ## 10. Performance Levers
+
 | Lever              | Effect                       | Hint                                   |
 | ------------------ | ---------------------------- | -------------------------------------- |
 | Model size         | Latency vs accuracy          | `tiny.en` ≈ 30 MB loads fastest        |
@@ -288,6 +307,7 @@ cargo tauri build          # build .app or MSI/DEB
 ---
 
 ## 11. Roadmap Ideas
+
 * Config window for model selection & hot-key change
 * Streaming, real-time transcription (partial results)
 * Windows/Linux support (replace Enigo backend where needed)
@@ -295,4 +315,5 @@ cargo tauri build          # build .app or MSI/DEB
 
 ---
 
-### 🎉 You now have a single, coherent guide—merge of all three GPT drafts—ready to get **Speakr** typing for you on macOS in a weekend. 
+🎉 You now have a single, coherent guide—merge of all three GPT drafts—ready to get **Speakr**
+typing for you on macOS in a weekend

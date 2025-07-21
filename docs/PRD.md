@@ -21,33 +21,40 @@ authors: David Jessup
 - [11. Appendix – Stakeholders \& Review](#11-appendix--stakeholders--review)
 
 ## 1. Purpose / Vision
-Speakr is a **privacy-first dictation hot-key utility** for macOS (Windows/Linux later). In a single keystroke, users can record speech, **transcribe entirely on-device**, and have the text typed directly into any active input field. Speakr aims to be the fastest way for developers, writers, and power-users to turn fleeting thoughts into code or prose without breaking flow, and **without sending audio to the cloud**.
 
+Speakr is a **privacy-first dictation hot-key utility** for macOS (Windows/Linux later). In a single
+keystroke, users can record speech, **transcribe entirely on-device**, and have the text typed
+directly into any active input field. Speakr aims to be the fastest way for developers, writers,
+and power-users to turn fleeting thoughts into code or prose without breaking flow, and
+**without sending audio to the cloud**.
 
 ## 2. Problem Statement
+
 1. Switching to dedicated dictation apps breaks focus and incurs network latency.
 2. Many corporate or offline environments forbid cloud speech services for privacy reasons.
-3. OS-level dictation is unreliable for code, lacks custom hot-keys, and has high latency on older hardware.
+3. OS-level dictation is unreliable for code, lacks custom hot-keys, and has high latency on older
+   hardware.
 
-**Opportunity**: A lightweight, keyboard-driven tool that works anywhere text can be typed, requires no network, and respects user privacy.
-
+**Opportunity**: A lightweight, keyboard-driven tool that works anywhere text can be typed, requires
+no network, and respects user privacy.
 
 ## 3. Goals & Non-Goals
 
 ### 3.1 Goals
-1. **<= 3 s** end-to-end latency for 5-second recordings on Apple Silicon (M-series).  
-2. **100% offline** – no external network calls.  
-3. Global hot-key works in background apps.  
-4. Support customisable models & hot-keys via UI.  
-5. Ship notarised universal macOS binary < 20 MB (excluding model).  
+
+1. **<= 3 s** end-to-end latency for 5-second recordings on Apple Silicon (M-series).
+2. **100% offline** – no external network calls.
+3. Global hot-key works in background apps.
+4. Support customisable models & hot-keys via UI.
+5. Ship notarised universal macOS binary < 20 MB (excluding model).
 6. Provide a clean upgrade path to Windows & Linux.
 
 ### 3.2 Non-Goals
-* Real-time streaming (v1 may paste only after stop).  
-* Mobile platforms.  
-* Full grammar / punctuation correction.  
-* Server-side sync or accounts.
 
+- Real-time streaming (v1 may paste only after stop).
+- Mobile platforms.
+- Full grammar / punctuation correction.
+- Server-side sync or accounts.
 
 ## 4. Personas
 
@@ -57,7 +64,6 @@ Speakr is a **privacy-first dictation hot-key utility** for macOS (Windows/Linux
 | **Writer Will**       | Draft snippets into any text editor without toggling apps.          |
 | **Privacy Peter**  | Dictate confidential material offline, no data leaves device.       |
 | **Accessibility Ava** | Replace or augment typing due to RSI, keep workflow keyboard-first. |
-
 
 ## 5. User Stories
 
@@ -74,7 +80,6 @@ Speakr is a **privacy-first dictation hot-key utility** for macOS (Windows/Linux
 | **Could** | _“As an advanced user, I can add bespoke words to the dictionary.”_ |
 | **Won’t (v1)** | _Live transcript shown word-by-word while speaking._ |
 
-
 ## 6. Functional Requirements
 
 | FR | Description |
@@ -89,7 +94,6 @@ Speakr is a **privacy-first dictation hot-key utility** for macOS (Windows/Linux
 | FR-8 | Settings persist locally (JSON in AppData,  no cloud). |
 | FR-9 | App auto-updates via GitHub Releases (optional in v1). |
 
-
 ## 7. Non-Functional Requirements
 
 | Category          | Requirement                                                      | Metric / Acceptance                                |
@@ -101,7 +105,6 @@ Speakr is a **privacy-first dictation hot-key utility** for macOS (Windows/Linux
 | **Compatibility** | macOS 13+. Intel macs may see doubled latency but functional.    | QA on Intel MBP (2020) & M1.                       |
 | **Accessibility** | Follows macOS VoiceOver / high-contrast guidelines.              | Apple Accessibility Inspector score ≥ 85.          |
 
-
 ## 8. Metrics / KPIs
 
 | Metric | Target |
@@ -111,7 +114,6 @@ Speakr is a **privacy-first dictation hot-key utility** for macOS (Windows/Linux
 | **Crash-free sessions** | > 99.5%. |
 | **Daily active users (DAU)** | post-launch target: 1 k. |
 | **% of transcripts requiring manual fix** | < 15% (optional feedback prompt). |
-
 
 ## 9. Milestones
 
@@ -123,24 +125,20 @@ Speakr is a **privacy-first dictation hot-key utility** for macOS (Windows/Linux
 | M3  – Windows/Linux alpha | Replace injection backend, install bundles  |
 | M4  – v1.0 GA             | Streaming (optional), website + docs        |
 
-
 ## 10. Open Questions
+
 1. Should we bundle a small GGUF model or trigger a first-run download wizard?
 2. How to handle non-Latin languages (auto-detect vs user-select)?
 3. Do we sandbox the app on macOS or rely on hardened runtime?
 4. Which licence (MIT vs GPL) given we embed Whisper weights?
 5. Accept user telemetry opt-in for latency metrics?
 
-
 ## 11. Appendix – Stakeholders & Review
-* **Product Lead** – @PM
-* **Engineering Lead** – @TechLead
-* **Design** – @UX
-* **Security** – @Sec
-* **QA** – @QA
+
+- **Product Lead** – @PM
+- **Engineering Lead** – @TechLead
+- **Design** – @UX
+- **Security** – @Sec
+- **QA** – @QA
 
 _Reviews_: Architecture (Tech), Security (Sec), Accessibility (UX).
-
----
-
-_End of Document_ 

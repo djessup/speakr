@@ -17,7 +17,11 @@ status: Draft
 - [10. Future Roadmap](#10-future-roadmap)
 
 ## 1. Purpose
-Speakr is a **privacy-first hot-key dictation utility** for macOS (with Windows/Linux on the roadmap). When the user presses a global shortcut, it records a short audio segment, runs an **on-device Whisper model**, and synthesises keystrokes to **type** the transcript into the currently-focused application – all in under a few seconds.
+
+Speakr is a **privacy-first hot-key dictation utility** for macOS (with Windows/Linux on the
+roadmap). When the user presses a global shortcut, it records a short audio segment, runs an
+**on-device Whisper model**, and synthesises keystrokes to **type** the transcript into the
+currently-focused application – all in under a few seconds.
 
 ---
 
@@ -52,9 +56,12 @@ flowchart TB
 ```
 
 Key points:
-1. **All heavy-weight logic lives in pure Rust** (`speakr-core`). The UI may be hidden without affecting functionality.
+
+1. **All heavy-weight logic lives in pure Rust** (`speakr-core`). The UI may be hidden without
+   affecting functionality.
 2. **No network access** – Whisper runs entirely on-device.
-3. **Plugin isolation** – Optional features (auto-start, clipboard, etc.) are added via Tauri plugins with explicit capability JSON.
+3. **Plugin isolation** – Optional features (auto-start, clipboard, etc.) are added via Tauri
+   plugins with explicit capability JSON.
 
 ---
 
@@ -63,7 +70,7 @@ Key points:
 | Layer    | Crate / Path              | Main Responsibilities                                                             |
 | -------- | ------------------------- | --------------------------------------------------------------------------------- |
 | Core     | `speakr-core/`            | Record audio (cpal) ➜ transcribe (whisper-rs) ➜ inject text (enigo)               |
-| Backend  | `speakr-tauri/`    | Registers global hot-key, exposes `#[tauri::command]` wrappers, persists settings |
+| Backend  | `speakr-tauri/`    | Registers global hot-key, exposes `#[tauri::command]` wrappers, persists settings        |
 | Frontend | `speakr-ui/` (optional)   | Leptos WASM UI for tray, preferences, status overlay                              |
 | Assets   | `models/`                 | GGUF Whisper models downloaded post-install                                       |
 
@@ -87,14 +94,17 @@ Failure cases (no mic, model missing, permission denied) surface via error event
 ---
 
 ## 5. Concurrency & Safety
-* **Tokio** multi-thread runtime drives asynchronous recording and Whisper inference.
-* The `AppState(Mutex<Option<Speakr>>)` guards the singleton Whisper context; loading occurs once at app start.
-* Hot-key handler offloads work to the runtime to keep the UI thread non-blocking.
-* Audio buffer uses a bounded `sync_channel` to avoid unbounded RAM growth.
+
+- **Tokio** multi-thread runtime drives asynchronous recording and Whisper inference.
+- The `AppState(Mutex<Option<Speakr>>)` guards the singleton Whisper context; loading occurs once
+  at app start.
+- Hot-key handler offloads work to the runtime to keep the UI thread non-blocking.
+- Audio buffer uses a bounded `sync_channel` to avoid unbounded RAM growth.
 
 ---
 
 ## 6. Security & Permissions
+
 | Platform | Permission        | Why                       | Request Mechanism                                     |
 | -------- | ----------------- | ------------------------- | ----------------------------------------------------- |
 | macOS    | Microphone access | Record audio              | `NSMicrophoneUsageDescription` (Info.plist)           |
@@ -106,6 +116,7 @@ The app runs **offline**; no data leaves the device.
 ---
 
 ## 7. Build & Packaging
+
 1. **Dev**: `trunk serve &` (frontend) + `cargo tauri dev` (backend)
 2. **Release**: `trunk build --release` ➜ `cargo tauri build`
 3. macOS notarisation: `xcrun notarytool submit --wait` after codesign.
@@ -114,14 +125,17 @@ The app runs **offline**; no data leaves the device.
 ---
 
 ## 8. Extensibility Points
-* **Voice Activity Detection**: plug-in `webrtc-vad` before Whisper to auto-stop on silence.
-* **Streaming transcripts**: call `whisper_rs::full_partial()` and enqueue keystrokes incrementally.
-* **Multi-language**: set `params.set_language(None)` for auto-detect.
-* **Cross-platform**: replace `enigo` backend with `send_input` (Win) or `xdo` (X11) while keeping public API.
+
+- **Voice Activity Detection**: plug-in `webrtc-vad` before Whisper to auto-stop on silence.
+- **Streaming transcripts**: call `whisper_rs::full_partial()` and enqueue keystrokes incrementally.
+- **Multi-language**: set `params.set_language(None)` for auto-detect.
+- **Cross-platform**: replace `enigo` backend with `send_input` (Win) or `xdo` (X11) while keeping
+  public API.
 
 ---
 
 ## 9. Risks & Mitigations
+
 | Risk                                         | Mitigation                                             |
 | -------------------------------------------- | ------------------------------------------------------ |
 | Keystroke injection blocked in secure fields | Fallback to clipboard-paste mode with warning          |
@@ -132,11 +146,13 @@ The app runs **offline**; no data leaves the device.
 ---
 
 ## 10. Future Roadmap
-1. **Settings sync** via `tauri-plugin-store` (JSON in AppData).  
-2. **Auto-start on login** (`tauri-plugin-autostart`).  
-3. **GPU inference** when Whisper Metal backend stabilises.  
+
+1. **Settings sync** via `tauri-plugin-store` (JSON in AppData).
+2. **Auto-start on login** (`tauri-plugin-autostart`).
+3. **GPU inference** when Whisper Metal backend stabilises.
 4. **Installer bundles** (DMG/MSI/DEB) with model downloader.
 
 ---
 
-_This document replaces the previous placeholder `docs/ARCHITECTURE.md` and should be kept up-to-date with all architectural changes._
+*This document replaces the previous placeholder `docs/ARCHITECTURE.md` and should be kept*
+*up-to-date with all architectural changes.*

@@ -35,6 +35,8 @@ and **Leptos**.
    tests.
 7. Use `tracing` for structured logs (no `println!`).
 8. Hide unsafe code behind safe wrappers and add `// SAFETY:` explanations.
+9. **IMPORTANT**: Functions with `#[tauri::command]` must NOT be marked as `pub` - this causes
+   duplicate macro generation errors. Use `async fn command_name()` not `pub async fn command_name()`.
 
 ---
 
