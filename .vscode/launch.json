@@ -1,0 +1,164 @@
+{
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Tauri Development Debug",
+      "cargo": {
+        "args": [
+          "build",
+          "--manifest-path=./src-tauri/Cargo.toml",
+          "--no-default-features"
+        ]
+      },
+      // task for the `beforeDevCommand` if used, must be configured in `.vscode/tasks.json`
+      "preLaunchTask": "ui:dev"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Tauri Production Debug",
+      "cargo": {
+        "args": ["build", "--release", "--manifest-path=./src-tauri/Cargo.toml"]
+      },
+      // task for the `beforeBuildCommand` if used, must be configured in `.vscode/tasks.json`
+      "preLaunchTask": "ui:build"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug unit tests in library 'speakr_types'",
+      "cargo": {
+        "args": ["test", "--no-run", "--lib", "--package=speakr-types"],
+        "filter": {
+          "name": "speakr_types",
+          "kind": "lib"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug unit tests in library 'speakr_core'",
+      "cargo": {
+        "args": ["test", "--no-run", "--lib", "--package=speakr-core"],
+        "filter": {
+          "name": "speakr_core",
+          "kind": "lib"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug integration test 'audio_capture'",
+      "cargo": {
+        "args": [
+          "test",
+          "--no-run",
+          "--test=audio_capture",
+          "--package=speakr-core"
+        ],
+        "filter": {
+          "name": "audio_capture",
+          "kind": "test"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug unit tests in library 'speakr_lib'",
+      "cargo": {
+        "args": ["test", "--no-run", "--lib", "--package=speakr-tauri"],
+        "filter": {
+          "name": "speakr_lib",
+          "kind": "lib"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug executable 'speakr-tauri'",
+      "cargo": {
+        "args": ["build", "--bin=speakr-tauri", "--package=speakr-tauri"],
+        "filter": {
+          "name": "speakr-tauri",
+          "kind": "bin"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug unit tests in executable 'speakr-tauri'",
+      "cargo": {
+        "args": [
+          "test",
+          "--no-run",
+          "--bin=speakr-tauri",
+          "--package=speakr-tauri"
+        ],
+        "filter": {
+          "name": "speakr-tauri",
+          "kind": "bin"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug integration test 'debug_save'",
+      "cargo": {
+        "args": [
+          "test",
+          "--no-run",
+          "--test=debug_save",
+          "--package=speakr-tauri"
+        ],
+        "filter": {
+          "name": "debug_save",
+          "kind": "test"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug integration test 'global_hotkey'",
+      "cargo": {
+        "args": [
+          "test",
+          "--no-run",
+          "--test=global_hotkey",
+          "--package=speakr-tauri"
+        ],
+        "filter": {
+          "name": "global_hotkey",
+          "kind": "test"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    }
+  ]
+}

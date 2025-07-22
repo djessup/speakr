@@ -3,5 +3,8 @@
     "rust": "html"
   },
   "pieces.cloudCapabilities": "Blended",
-  "workbench.colorTheme": "SynthWave '84"
+  "workbench.colorTheme": "SynthWave '84",
+  "todo-tree.tree.showBadges": true,
+  "todo-tree.tree.disableCompactFolders": true,
+  "todo-tree.tree.showCountsInTree": true
 }

@@ -100,14 +100,23 @@ repos:
     rev: v4.5.0
     hooks:
       - id: trailing-whitespace
+
       - id: check-yaml
         args: ["--unsafe"] # Allow custom YAML tags
+
       - id: check-added-large-files
+
         args: ["--maxkb=1000"]
         exclude: docs/theme/mermaid.min.js
+
       - id: check-merge-conflict
+
       - id: check-json
+        # Exclude VS Code and Cursor JSON files (they support comments - JSONC format)
+        exclude: \.vscode/.*\.json$
+
       - id: check-toml
+
       - id: mixed-line-ending
         args: ["--fix=lf"]
 
