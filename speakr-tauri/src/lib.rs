@@ -7,13 +7,21 @@
 //! - Model file validation
 //! - System integration
 
-use speakr_types::{AppError, AppSettings, HotkeyConfig, HotkeyError};
+use speakr_types::{
+    AppError, AppSettings, BackendStatus, HotkeyConfig, HotkeyError, ServiceStatus, StatusUpdate,
+};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut};
 use tracing::{debug, error, info, warn};
+
+// Add import for audio functionality
+use speakr_core::audio::{AudioRecorder, RecordingConfig};
+
+// Add import for WAV file writing
+use hound::{WavSpec, WavWriter};
 
 #[cfg(debug_assertions)]
 use serde::{Deserialize, Serialize};
@@ -44,9 +52,25 @@ pub struct DebugLogMessage {
     pub message: String,
 }
 
+// Shared state for debug recording session
+#[cfg(debug_assertions)]
+#[derive(Debug)]
+struct DebugRecordingState {
+    recorder: Option<AudioRecorder>,
+    start_time: Option<std::time::Instant>,
+}
+
 #[cfg(debug_assertions)]
 static DEBUG_LOG_MESSAGES: LazyLock<Arc<Mutex<VecDeque<DebugLogMessage>>>> =
     LazyLock::new(|| Arc::new(Mutex::new(VecDeque::with_capacity(1000))));
+
+#[cfg(debug_assertions)]
+static DEBUG_RECORDING_STATE: LazyLock<Arc<Mutex<DebugRecordingState>>> = LazyLock::new(|| {
+    Arc::new(Mutex::new(DebugRecordingState {
+        recorder: None,
+        start_time: None,
+    }))
+});
 
 #[cfg(debug_assertions)]
 impl DebugLogMessage {
@@ -640,14 +664,40 @@ async fn debug_test_audio_recording() -> Result<String, AppError> {
     Ok("Audio recording test completed successfully! (Mock implementation)".to_string())
 }
 
-/// Debug command to start push-to-talk recording.
-///
-/// This command is only available in debug builds and provides
-/// a stub implementation for testing push-to-talk recording.
+/// Gets the default output directory for debug audio recordings.
 ///
 /// # Returns
 ///
-/// Returns a success message for testing purposes.
+/// Returns the path to the user's Documents/Speakr/debug_recordings/ directory.
+///
+/// # Errors
+///
+/// Returns `AppError` if the directory cannot be created.
+#[cfg(debug_assertions)]
+fn get_debug_recordings_directory() -> Result<PathBuf, AppError> {
+    let documents_dir = dirs::document_dir()
+        .ok_or_else(|| AppError::Settings("Could not find Documents directory".to_string()))?;
+
+    let debug_dir = documents_dir.join("Speakr").join("debug_recordings");
+
+    // Create directory if it doesn't exist
+    if !debug_dir.exists() {
+        fs::create_dir_all(&debug_dir).map_err(|e| {
+            AppError::FileSystem(format!("Failed to create debug recordings dir: {e}"))
+        })?;
+    }
+
+    Ok(debug_dir)
+}
+
+/// Debug command to start push-to-talk recording with real audio backend.
+///
+/// This command is only available in debug builds and starts
+/// real audio recording using the speakr-core AudioRecorder.
+///
+/// # Returns
+///
+/// Returns a success message indicating recording has started.
 ///
 /// # Errors
 ///
@@ -655,26 +705,57 @@ async fn debug_test_audio_recording() -> Result<String, AppError> {
 #[cfg(debug_assertions)]
 #[tauri::command]
 async fn debug_start_recording() -> Result<String, AppError> {
-    info!("🎙️ Debug: Starting push-to-talk recording");
+    info!("🎙️ Debug: Starting real push-to-talk recording");
     add_debug_log(
         DebugLogLevel::Info,
         "speakr-debug",
-        "Push-to-talk recording started",
+        "Real push-to-talk recording started",
     );
 
-    // TODO: Connect to speakr-core audio recording functionality
-    // For now, return a mock success result
-    Ok("Push-to-talk recording started (Mock implementation)".to_string())
+    // Check if already recording
+    {
+        let state = DEBUG_RECORDING_STATE.lock().unwrap();
+        if state.recorder.is_some() {
+            return Ok("Recording already in progress".to_string());
+        }
+    }
+
+    // Create audio recorder with 30 second max duration (push-to-talk should be shorter)
+    let config = RecordingConfig::new(30);
+    let recorder = AudioRecorder::new(config)
+        .await
+        .map_err(|e| AppError::Settings(format!("Failed to create audio recorder: {e}")))?;
+
+    // Start recording
+    recorder
+        .start_recording()
+        .await
+        .map_err(|e| AppError::Settings(format!("Failed to start recording: {e}")))?;
+
+    // Store recorder in global state
+    {
+        let mut state = DEBUG_RECORDING_STATE.lock().unwrap();
+        state.recorder = Some(recorder);
+        state.start_time = Some(std::time::Instant::now());
+    }
+
+    add_debug_log(
+        DebugLogLevel::Info,
+        "speakr-core",
+        "Real audio recording started successfully",
+    );
+
+    Ok("🎙️ Real recording started! Release button to stop and save.".to_string())
 }
 
-/// Debug command to stop push-to-talk recording.
+/// Debug command to stop push-to-talk recording and save to disk.
 ///
-/// This command is only available in debug builds and provides
-/// a stub implementation for testing push-to-talk recording.
+/// This command is only available in debug builds and stops
+/// the current recording, then saves the audio to a timestamped WAV file.
 ///
 /// # Returns
 ///
-/// Returns a success message for testing purposes.
+/// Returns a message with the file path where audio was saved.
 ///
 /// # Errors
 ///
@@ -682,16 +763,62 @@ async fn debug_start_recording() -> Result<String, AppError> {
 #[cfg(debug_assertions)]
 #[tauri::command]
 async fn debug_stop_recording() -> Result<String, AppError> {
-    info!("⏹️ Debug: Stopping push-to-talk recording");
+    info!("⏹️ Debug: Stopping real push-to-talk recording and saving to disk");
+
+    // Get recorder from global state
+    let (recorder, start_time) = {
+        let mut state = DEBUG_RECORDING_STATE.lock().unwrap();
+        let recorder = state.recorder.take();
+        let start_time = state.start_time.take();
+        (recorder, start_time)
+    };
+
+    let Some(recorder) = recorder else {
+        add_debug_log(
+            DebugLogLevel::Warn,
+            "speakr-debug",
+            "No active recording to stop",
+        );
+        return Ok("No recording was active".to_string());
+    };
+
+    // Stop recording and get samples
+    let result = recorder
+        .stop_recording()
+        .await
+        .map_err(|e| AppError::Settings(format!("Failed to stop recording: {e}")))?;
+
+    let samples = result.samples();
+    let duration = start_time.map(|t| t.elapsed()).unwrap_or_default();
+
     add_debug_log(
         DebugLogLevel::Info,
         "speakr-debug",
-        "Push-to-talk recording stopped",
+        &format!(
+            "Recording stopped, captured {} samples in {:.2}s",
+            samples.len(),
+            duration.as_secs_f64()
+        ),
     );
 
-    // TODO: Connect to speakr-core audio recording functionality
-    // For now, return a mock success result
-    Ok("Push-to-talk recording stopped (Mock implementation)".to_string())
+    // Save to file in debug recordings directory
+    let output_dir = get_debug_recordings_directory()?;
+    let filename = generate_audio_filename_with_timestamp();
+    let output_path = output_dir.join(filename);
+
+    save_audio_samples_to_wav_file(&samples, &output_path).await?;
+
+    let success_message = format!(
+        "⏹️ Recording saved! {} samples ({:.2}s) → {}",
+        samples.len(),
+        duration.as_secs_f64(),
+        output_path.display()
+    );
+
+    add_debug_log(DebugLogLevel::Info, "speakr-debug", &success_message);
+
+    info!("{}", success_message);
+    Ok(success_message)
 }
 
 /// Debug command to get recent log messages.
@@ -926,6 +1053,231 @@ async fn load_settings_from_dir(settings_dir: &PathBuf) -> Result<AppSettings, A
     }
 }
 
+// 🟢 GREEN: Minimal implementations for TDD tests
+
+/// Generates a filename with timestamp for audio recordings.
+///
+/// # Returns
+///
+/// A filename string in the format "recording_YYYY-MM-DD_HH-MM-SS.wav"
+fn generate_audio_filename_with_timestamp() -> String {
+    let now = chrono::Utc::now();
+    format!("recording_{}.wav", now.format("%Y-%m-%d_%H-%M-%S%.3f"))
+}
+
+/// Saves audio samples to a WAV file.
+///
+/// # Arguments
+///
+/// * `samples` - The audio samples to save (16-bit mono)
+/// * `output_path` - The path where the WAV file should be saved
+///
+/// # Returns
+///
+/// Returns `Ok(())` on success.
+///
+/// # Errors
+///
+/// Returns `AppError` if the file cannot be written.
+async fn save_audio_samples_to_wav_file(
+    samples: &[i16],
+    output_path: &PathBuf,
+) -> Result<(), AppError> {
+    let spec = WavSpec {
+        channels: 1,         // Mono
+        sample_rate: 16_000, // 16 kHz
+        bits_per_sample: 16, // 16-bit
+        sample_format: hound::SampleFormat::Int,
+    };
+
+    let mut writer = WavWriter::create(output_path, spec)
+        .map_err(|e| AppError::FileSystem(format!("Failed to create WAV file: {e}")))?;
+
+    for &sample in samples {
+        writer
+            .write_sample(sample)
+            .map_err(|e| AppError::FileSystem(format!("Failed to write audio sample: {e}")))?;
+    }
+
+    writer
+        .finalize()
+        .map_err(|e| AppError::FileSystem(format!("Failed to finalize WAV file: {e}")))?;
+
+    Ok(())
+}
+
+/// Records audio to file (mock implementation for testing).
+///
+/// # Arguments
+///
+/// * `output_dir` - Directory where the audio file should be saved
+/// * `duration_secs` - Recording duration in seconds
+///
+/// # Returns
+///
+/// Returns the path to the created audio file.
+///
+/// # Errors
+///
+/// Returns `AppError` if recording or file saving fails.
+#[allow(dead_code)] // Used only in tests
+async fn debug_record_audio_to_file(
+    output_dir: &Path,
+    duration_secs: u32,
+) -> Result<PathBuf, AppError> {
+    // Generate filename with timestamp
+    let filename = generate_audio_filename_with_timestamp();
+    let output_path = output_dir.join(filename);
+
+    // Create mock audio samples for testing (simple sine wave)
+    let sample_rate = 16_000;
+    let samples: Vec<i16> = (0..sample_rate * duration_secs)
+        .map(|i| {
+            let t = (i as f64) / (sample_rate as f64);
+            let frequency = 440.0; // A note
+            let amplitude = 16000.0;
+            (amplitude * (2.0 * std::f64::consts::PI * frequency * t).sin()) as i16
+        })
+        .collect();
+
+    // Save to WAV file
+    save_audio_samples_to_wav_file(&samples, &output_path).await?;
+
+    Ok(output_path)
+}
+
+/// Records real audio to file using speakr-core AudioRecorder.
+///
+/// # Arguments
+///
+/// * `output_dir` - Directory where the audio file should be saved
+/// * `duration_secs` - Recording duration in seconds
+///
+/// # Returns
+///
+/// Returns the path to the created audio file.
+///
+/// # Errors
+///
+/// Returns `AppError` if recording or file saving fails.
+#[allow(dead_code)] // Used only in tests
+async fn debug_record_real_audio_to_file(
+    output_dir: &Path,
+    duration_secs: u32,
+) -> Result<PathBuf, AppError> {
+    // Create recorder with the specified duration
+    let config = RecordingConfig::new(duration_secs);
+    let recorder = AudioRecorder::new(config)
+        .await
+        .map_err(|e| AppError::Settings(format!("Failed to create audio recorder: {e}")))?;
+
+    // Start recording
+    recorder
+        .start_recording()
+        .await
+        .map_err(|e| AppError::Settings(format!("Failed to start recording: {e}")))?;
+
+    // Wait for the recording duration
+    tokio::time::sleep(std::time::Duration::from_secs(duration_secs as u64)).await;
+
+    // Stop recording and get samples
+    let result = recorder
+        .stop_recording()
+        .await
+        .map_err(|e| AppError::Settings(format!("Failed to stop recording: {e}")))?;
+
+    let samples = result.samples();
+
+    // Generate filename with timestamp and save to file
+    let filename = generate_audio_filename_with_timestamp();
+    let output_path = output_dir.join(filename);
+
+    save_audio_samples_to_wav_file(&samples, &output_path).await?;
+
+    Ok(output_path)
+}
+
+/// Enum to identify different service components
+#[derive(Debug, Clone, PartialEq)]
+pub enum ServiceComponent {
+    AudioCapture,
+    Transcription,
+    TextInjection,
+}
+
+/// Service responsible for tracking backend component status
+pub struct BackendStatusService {
+    status: Arc<Mutex<BackendStatus>>,
+}
+
+impl BackendStatusService {
+    /// Creates a new backend status service with all services starting
+    pub fn new() -> Self {
+        Self {
+            status: Arc::new(Mutex::new(BackendStatus::new_starting())),
+        }
+    }
+
+    /// Gets the current status snapshot
+    pub fn get_current_status(&self) -> BackendStatus {
+        self.status.lock().unwrap().clone()
+    }
+
+    /// Updates the status of a specific service component
+    pub fn update_service_status(&mut self, component: ServiceComponent, status: ServiceStatus) {
+        if let Ok(mut current_status) = self.status.lock() {
+            // Update timestamp when any service changes
+            current_status.timestamp = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_millis() as u64;
+
+            // Update the specific service
+            match component {
+                ServiceComponent::AudioCapture => {
+                    current_status.audio_capture = status;
+                }
+                ServiceComponent::Transcription => {
+                    current_status.transcription = status;
+                }
+                ServiceComponent::TextInjection => {
+                    current_status.text_injection = status;
+                }
+            }
+        }
+    }
+
+    /// Emits status change event to frontend
+    pub fn emit_status_change(&self, app_handle: &AppHandle) -> Result<(), String> {
+        let status = self.get_current_status();
+        app_handle
+            .emit("speakr-status-changed", &status)
+            .map_err(|e| format!("Failed to emit status change: {e}"))
+    }
+
+    /// Emits heartbeat event to frontend
+    pub fn emit_heartbeat(&self, app_handle: &AppHandle) -> Result<(), String> {
+        let status = self.get_current_status();
+        app_handle
+            .emit("speakr-heartbeat", &status)
+            .map_err(|e| format!("Failed to emit heartbeat: {e}"))
+    }
+}
+
+impl Default for BackendStatusService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tauri command to get current backend status
+#[tauri::command]
+async fn get_backend_status() -> Result<StatusUpdate, AppError> {
+    // For now, return a starting status
+    // In real implementation, this would get status from a global service instance
+    Ok(BackendStatus::new_starting())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder
@@ -950,7 +1302,8 @@ pub fn run() {
                     debug_start_recording,
                     debug_stop_recording,
                     debug_get_log_messages,
-                    debug_clear_log_messages
+                    debug_clear_log_messages,
+                    get_backend_status
                 ]
             }
             #[cfg(not(debug_assertions))]
@@ -964,7 +1317,8 @@ pub fn run() {
                     register_hot_key,
                     set_auto_launch,
                     register_global_hotkey,
-                    unregister_global_hotkey
+                    unregister_global_hotkey,
+                    get_backend_status
                 ]
             }
         })
@@ -1064,6 +1418,7 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use speakr_types::ServiceStatus;
 
     #[tokio::test]
     async fn test_app_settings_default() {
@@ -1509,5 +1864,268 @@ mod tests {
             .await
             .expect("Should recover");
         assert_eq!(recovered, good_settings);
+    }
+
+    // 🔴 RED: Tests for status indicator backend functionality
+    #[tokio::test]
+    async fn test_backend_status_service_creation() {
+        let service = BackendStatusService::new();
+        let status = service.get_current_status();
+
+        // Should start with all services in "Starting" state
+        assert!(!status.is_ready());
+        assert_eq!(status.audio_capture, ServiceStatus::Starting);
+        assert_eq!(status.transcription, ServiceStatus::Starting);
+        assert_eq!(status.text_injection, ServiceStatus::Starting);
+    }
+
+    #[tokio::test]
+    async fn test_backend_status_service_update_single_service() {
+        let mut service = BackendStatusService::new();
+
+        // Update a single service to Ready
+        service.update_service_status(ServiceComponent::AudioCapture, ServiceStatus::Ready);
+        let status = service.get_current_status();
+
+        assert_eq!(status.audio_capture, ServiceStatus::Ready);
+        assert_eq!(status.transcription, ServiceStatus::Starting);
+        assert_eq!(status.text_injection, ServiceStatus::Starting);
+        assert!(!status.is_ready()); // Not all ready yet
+    }
+
+    #[tokio::test]
+    async fn test_backend_status_service_all_services_ready() {
+        let mut service = BackendStatusService::new();
+
+        // Update all services to Ready
+        service.update_service_status(ServiceComponent::AudioCapture, ServiceStatus::Ready);
+        service.update_service_status(ServiceComponent::Transcription, ServiceStatus::Ready);
+        service.update_service_status(ServiceComponent::TextInjection, ServiceStatus::Ready);
+
+        let status = service.get_current_status();
+        assert!(status.is_ready()); // All ready
+    }
+
+    #[tokio::test]
+    async fn test_backend_status_service_error_handling() {
+        let mut service = BackendStatusService::new();
+
+        // Set an error on transcription service
+        service.update_service_status(
+            ServiceComponent::Transcription,
+            ServiceStatus::Error("Failed to load Whisper model".to_string()),
+        );
+
+        let status = service.get_current_status();
+        assert!(!status.is_ready());
+        assert!(matches!(status.transcription, ServiceStatus::Error(_)));
+    }
+
+    #[tokio::test]
+    async fn test_backend_status_timestamps() {
+        let mut service = BackendStatusService::new();
+        let initial_timestamp = service.get_current_status().timestamp;
+
+        // Wait a bit and update a service
+        tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+        service.update_service_status(ServiceComponent::AudioCapture, ServiceStatus::Ready);
+
+        let updated_timestamp = service.get_current_status().timestamp;
+        assert!(
+            updated_timestamp > initial_timestamp,
+            "Timestamp should be updated"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_get_backend_status_tauri_command() {
+        // 🔴 RED: This test should fail because the command doesn't exist yet
+
+        // This would test the Tauri command interface
+        // We can't easily test the Tauri command without a full Tauri context,
+        // so for now we test the underlying service directly
+        let service = BackendStatusService::new();
+        let status = service.get_current_status();
+
+        assert!(!status.is_ready()); // Should start with services not ready
+    }
+
+    // TDD: Tests for audio recording with file saving functionality
+    #[tokio::test]
+    async fn test_debug_record_audio_to_file_saves_with_timestamp() {
+        // 🔴 RED: This test should fail because the function doesn't exist yet
+        use std::time::SystemTime;
+        use tempfile::TempDir;
+
+        // Arrange
+        let temp_dir = TempDir::new().expect("Should create temp dir");
+        let output_dir = temp_dir.path();
+
+        let before_recording = SystemTime::now();
+
+        // Act
+        let file_path = debug_record_audio_to_file(output_dir, 2)
+            .await
+            .expect("Should record audio to file");
+
+        let after_recording = SystemTime::now();
+
+        // Assert
+        assert!(file_path.exists(), "Audio file should be created");
+        assert!(
+            file_path.extension().unwrap_or_default() == "wav",
+            "Should create WAV file"
+        );
+
+        // Check timestamp in filename
+        let filename = file_path.file_name().unwrap().to_string_lossy();
+        assert!(
+            filename.starts_with("recording_"),
+            "Filename should start with 'recording_'"
+        );
+
+        // File should contain actual audio data (not just empty)
+        let metadata = std::fs::metadata(&file_path).expect("Should get file metadata");
+        assert!(
+            metadata.len() > 44,
+            "WAV file should be larger than header (44 bytes)"
+        ); // WAV header is 44 bytes
+
+        // Verify file timestamp is between before/after recording
+        let file_time = metadata.modified().expect("Should get modified time");
+        assert!(
+            file_time >= before_recording && file_time <= after_recording,
+            "File timestamp should be within recording window"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_debug_record_audio_to_file_creates_unique_filenames() {
+        // 🔴 RED: This test should fail because the function doesn't exist yet
+        use tempfile::TempDir;
+
+        // Arrange
+        let temp_dir = TempDir::new().expect("Should create temp dir");
+        let output_dir = temp_dir.path();
+
+        // Act - record two files quickly
+        let file1 = debug_record_audio_to_file(output_dir, 1)
+            .await
+            .expect("Should record first audio file");
+
+        // Small delay to ensure different timestamp
+        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+
+        let file2 = debug_record_audio_to_file(output_dir, 1)
+            .await
+            .expect("Should record second audio file");
+
+        // Assert
+        assert_ne!(file1, file2, "Should create files with unique names");
+        assert!(file1.exists(), "First file should exist");
+        assert!(file2.exists(), "Second file should exist");
+    }
+
+    #[tokio::test]
+    async fn test_save_audio_samples_to_wav_file() {
+        // 🔴 RED: This test should fail because the function doesn't exist yet
+        use tempfile::TempDir;
+
+        // Arrange
+        let temp_dir = TempDir::new().expect("Should create temp dir");
+        let output_path = temp_dir.path().join("test_audio.wav");
+
+        // Create test samples (simple sine wave pattern)
+        let sample_rate = 16_000;
+        let duration_secs = 2;
+        let samples: Vec<i16> = (0..sample_rate * duration_secs)
+            .map(|i| {
+                ((((i as f64) * 2.0 * std::f64::consts::PI * 440.0) / (sample_rate as f64)).sin()
+                    * 16000.0) as i16
+            })
+            .collect();
+
+        // Act
+        save_audio_samples_to_wav_file(&samples, &output_path)
+            .await
+            .expect("Should save audio samples to WAV file");
+
+        // Assert
+        assert!(output_path.exists(), "WAV file should be created");
+
+        let metadata = std::fs::metadata(&output_path).expect("Should get file metadata");
+        assert!(metadata.len() > 44, "WAV file should be larger than header");
+
+        // Check WAV header (first 4 bytes should be "RIFF")
+        let file_content = std::fs::read(&output_path).expect("Should read file");
+        assert_eq!(&file_content[0..4], b"RIFF", "Should have RIFF header");
+        assert_eq!(&file_content[8..12], b"WAVE", "Should have WAVE format");
+    }
+
+    #[tokio::test]
+    async fn test_generate_audio_filename_with_timestamp() {
+        // 🔴 RED: This test should fail because the function doesn't exist yet
+        use std::time::SystemTime;
+
+        // Act
+        let _before = SystemTime::now();
+        let filename = generate_audio_filename_with_timestamp();
+        let _after = SystemTime::now();
+
+        // Assert
+        assert!(
+            filename.starts_with("recording_"),
+            "Should start with 'recording_'"
+        );
+        assert!(filename.ends_with(".wav"), "Should end with '.wav'");
+
+        // Should contain timestamp components (year, month, day, hour, minute, second)
+        assert!(
+            filename.contains("2024") || filename.contains("2025"),
+            "Should contain year"
+        );
+
+        // Generate another filename and ensure they're different
+        let filename2 = generate_audio_filename_with_timestamp();
+        if filename == filename2 {
+            // If they're the same, wait a bit and try again
+            tokio::time::sleep(std::time::Duration::from_millis(1001)).await;
+            let filename3 = generate_audio_filename_with_timestamp();
+            assert_ne!(filename, filename3, "Filenames should be unique over time");
+        }
+    }
+
+    #[tokio::test]
+    #[ignore = "Requires audio hardware access - run manually with 'cargo test -- --ignored'"]
+    async fn test_debug_real_audio_recording_integration() {
+        // 🔴 RED: This test should fail because the real integration doesn't exist yet
+        use tempfile::TempDir;
+
+        // Arrange
+        let temp_dir = TempDir::new().expect("Should create temp dir");
+        let output_dir = temp_dir.path();
+
+        // Test that we can record real audio and save to file
+        // This would use the actual AudioRecorder from speakr-core
+
+        // Act - This should do a real recording for 1 second
+        let file_path = debug_record_real_audio_to_file(output_dir, 1)
+            .await
+            .expect("Should record real audio to file");
+
+        // Assert
+        assert!(file_path.exists(), "Real audio file should be created");
+
+        let metadata = std::fs::metadata(&file_path).expect("Should get file metadata");
+        // For 1 second of 16kHz mono audio, expect roughly:
+        // 44 bytes (WAV header) + (16000 samples * 2 bytes/sample) = ~32044 bytes
+        assert!(
+            metadata.len() > 1000,
+            "Real audio file should contain substantial data"
+        );
+        assert!(
+            metadata.len() < 100_000,
+            "File size should be reasonable for 1 second"
+        );
     }
 }

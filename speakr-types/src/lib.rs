@@ -187,6 +187,85 @@ impl ModelInfo {
     }
 }
 
+/// Status of an individual service component in the backend
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum ServiceStatus {
+    Ready,
+    Starting,
+    Error(String),
+    Unavailable,
+}
+
+impl Default for ServiceStatus {
+    fn default() -> Self {
+        Self::Starting
+    }
+}
+
+impl ServiceStatus {
+    /// Returns the display name for the status
+    pub fn display_name(&self) -> &str {
+        match self {
+            ServiceStatus::Ready => "Ready",
+            ServiceStatus::Starting => "Starting",
+            ServiceStatus::Error(_) => "Error",
+            ServiceStatus::Unavailable => "Unavailable",
+        }
+    }
+
+    /// Returns true if the service is ready
+    pub fn is_ready(&self) -> bool {
+        matches!(self, ServiceStatus::Ready)
+    }
+}
+
+/// Overall backend system status
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct BackendStatus {
+    pub audio_capture: ServiceStatus,
+    pub transcription: ServiceStatus,
+    pub text_injection: ServiceStatus,
+    pub timestamp: u64,
+}
+
+impl BackendStatus {
+    /// Returns true if all services are ready
+    pub fn is_ready(&self) -> bool {
+        self.audio_capture.is_ready()
+            && self.transcription.is_ready()
+            && self.text_injection.is_ready()
+    }
+
+    /// Creates a new status with all services starting
+    pub fn new_starting() -> Self {
+        Self {
+            audio_capture: ServiceStatus::Starting,
+            transcription: ServiceStatus::Starting,
+            text_injection: ServiceStatus::Starting,
+            timestamp: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_millis() as u64,
+        }
+    }
+
+    /// Creates a new status with all services ready
+    pub fn new_ready() -> Self {
+        Self {
+            audio_capture: ServiceStatus::Ready,
+            transcription: ServiceStatus::Ready,
+            text_injection: ServiceStatus::Ready,
+            timestamp: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_millis() as u64,
+        }
+    }
+}
+
+/// Type alias for status updates sent to frontend
+pub type StatusUpdate = BackendStatus;
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -230,5 +309,83 @@ mod tests {
         let json = serde_json::to_string(&settings).unwrap();
         let deserialized: AppSettings = serde_json::from_str(&json).unwrap();
         assert_eq!(settings, deserialized);
+    }
+
+    // 🔴 RED: Tests for status indicator functionality
+    #[test]
+    fn test_service_status_default() {
+        let status = ServiceStatus::default();
+        assert!(matches!(status, ServiceStatus::Starting));
+    }
+
+    #[test]
+    fn test_service_status_display() {
+        assert_eq!(ServiceStatus::Ready.display_name(), "Ready");
+        assert_eq!(ServiceStatus::Starting.display_name(), "Starting");
+        assert_eq!(
+            ServiceStatus::Error("test error".to_string()).display_name(),
+            "Error"
+        );
+        assert_eq!(ServiceStatus::Unavailable.display_name(), "Unavailable");
+    }
+
+    #[test]
+    fn test_backend_status_ready_when_all_services_ready() {
+        let status = BackendStatus {
+            audio_capture: ServiceStatus::Ready,
+            transcription: ServiceStatus::Ready,
+            text_injection: ServiceStatus::Ready,
+            timestamp: 12345,
+        };
+        assert!(status.is_ready());
+    }
+
+    #[test]
+    fn test_backend_status_not_ready_when_services_starting() {
+        let status = BackendStatus {
+            audio_capture: ServiceStatus::Starting,
+            transcription: ServiceStatus::Ready,
+            text_injection: ServiceStatus::Ready,
+            timestamp: 12345,
+        };
+        assert!(!status.is_ready());
+    }
+
+    #[test]
+    fn test_backend_status_not_ready_when_service_error() {
+        let status = BackendStatus {
+            audio_capture: ServiceStatus::Ready,
+            transcription: ServiceStatus::Error("Failed to load model".to_string()),
+            text_injection: ServiceStatus::Ready,
+            timestamp: 12345,
+        };
+        assert!(!status.is_ready());
+    }
+
+    #[test]
+    fn test_backend_status_serialization() {
+        let status = BackendStatus {
+            audio_capture: ServiceStatus::Ready,
+            transcription: ServiceStatus::Starting,
+            text_injection: ServiceStatus::Error("Permission denied".to_string()),
+            timestamp: 67890,
+        };
+
+        let json = serde_json::to_string(&status).unwrap();
+        let deserialized: BackendStatus = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(deserialized.timestamp, status.timestamp);
+        assert_eq!(deserialized.audio_capture, status.audio_capture);
+        assert_eq!(deserialized.transcription, status.transcription);
+        assert_eq!(deserialized.text_injection, status.text_injection);
+    }
+
+    #[test]
+    fn test_status_update_creation() {
+        let update = StatusUpdate::new_ready();
+        assert!(update.is_ready());
+
+        let update_starting = StatusUpdate::new_starting();
+        assert!(!update_starting.is_ready());
     }
 }
