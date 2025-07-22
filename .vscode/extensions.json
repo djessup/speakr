@@ -1,7 +1,13 @@
 {
   "recommendations": [
-    "rust-lang.rust-analyzer",
     "pinage404.nix-extension-pack",
-    "kamadorueda.alejandra"
+    "kamadorueda.alejandra",
+    "tamasfe.even-better-toml",
+    "jnoortheen.nix-ide",
+    "jinxdash.prettier-rust",
+    "esbenp.prettier-vscode",
+    "tauri-apps.tauri-vscode",
+    "swellaby.vscode-rust-test-adapter",
+    "dustypomerleau.rust-syntax"
   ]
 }
