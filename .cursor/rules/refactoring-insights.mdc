@@ -1,0 +1,30 @@
+# Key Refactoring Insights
+
+Based on our Speakr Tauri lib.rs refactoring review, these patterns emerged:
+
+## Tauri Command Pattern
+- Keep `#[tauri::command]` wrappers in lib.rs for registration
+- Extract implementations as `*_internal()` functions to modules
+- Use `pub(crate)` for internal APIs, not `pub`
+
+## Test Extraction Limitations
+- Cannot extract tests using private functions without making them `pub(crate)`
+- Tauri command tests need app context - hard to extract
+- Mark problematic tests as "SKIPPED" with reasons
+
+## Function Visibility Strategy
+- Use `pub(crate)` for cross-module internal APIs
+- Avoid `pub` unless truly part of public crate interface
+- Enables refactoring while maintaining encapsulation
+
+## Module Organization
+- Extract logic to domain modules (settings/, services/, debug/)
+- Keep coordination code in lib.rs
+- Use mod.rs for re-exports within modules
+
+## Conditional Compilation
+- Debug-only code stays wrapped in `#[cfg(debug_assertions)]`
+- Extract debug implementations but keep wrappers in lib.rs
+- Maintain existing command registration patterns
+
+Validate each phase: `cargo check` + `cargo test --workspace` + `cargo clippy`
