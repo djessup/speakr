@@ -1,7 +1,9 @@
 use leptos::prelude::*;
 use wasm_bindgen::prelude::*;
+use wasm_bindgen_futures::spawn_local;
 
 use crate::settings::SettingsPanel;
+use speakr_types::BackendStatus;
 
 #[cfg(debug_assertions)]
 use crate::debug::DebugPanel;
@@ -12,12 +14,47 @@ extern "C" {
     async fn invoke(cmd: &str, args: JsValue) -> JsValue;
 }
 
+/// Helper function to invoke Tauri commands that return backend status
+async fn get_backend_status() -> Result<BackendStatus, String> {
+    let args = JsValue::NULL;
+    let result = invoke("get_backend_status", args).await;
+    let json_str = js_sys::JSON::stringify(&result)
+        .map_err(|_| "Failed to stringify response".to_string())?
+        .as_string()
+        .ok_or("Failed to convert to string".to_string())?;
+
+    serde_json::from_str::<BackendStatus>(&json_str)
+        .map_err(|e| format!("Failed to parse backend status: {e}"))
+}
+
 /// Main application view focused on settings configuration.
 /// This is a modern, clean interface for Speakr dictation settings.
 #[component]
 pub fn App() -> impl IntoView {
     #[cfg(debug_assertions)]
     let (show_debug_panel, set_show_debug_panel) = signal(false);
+
+    // Backend status state
+    let (backend_status, set_backend_status) = signal(BackendStatus::new_starting());
+
+    // Load initial backend status
+    Effect::new(move || {
+        spawn_local(async move {
+            match get_backend_status().await {
+                Ok(status) => {
+                    set_backend_status.set(status);
+                }
+                Err(e) => {
+                    web_sys::console::error_1(
+                        &format!("Failed to load backend status: {e}").into(),
+                    );
+                }
+            }
+        });
+    });
+
+    // TODO: Add event listener for "speakr-status-changed" events from backend
+    // This would update the status in real-time when services change state
 
     view! {
         <div class="app">
@@ -31,10 +68,22 @@ pub fn App() -> impl IntoView {
                         </div>
                     </div>
                     <div class="header-status">
-                        <div class="status-indicator ready">
-                            <div class="status-dot"></div>
-                            <span>"Ready"</span>
-                        </div>
+                        {move || {
+                            let status = backend_status.get();
+                            let status_class = if status.is_ready() { "ready" } else { "starting" };
+                            let status_text = if status.is_ready() {
+                                "Ready"
+                            } else {
+                                "Starting..."
+                            };
+
+                            view! {
+                                <div class=format!("status-indicator {}", status_class)>
+                                    <div class="status-dot"></div>
+                                    <span>{status_text}</span>
+                                </div>
+                            }
+                        }}
 
                         // Debug button only visible in debug builds
                         {move || {

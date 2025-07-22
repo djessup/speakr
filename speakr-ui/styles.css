@@ -162,6 +162,19 @@ body {
   animation: pulse 2s infinite;
 }
 
+.status-indicator.starting {
+  background: #fef3c7; /* Yellow background for starting state */
+  color: #d97706; /* Orange text for starting state */
+}
+
+.status-indicator.starting .status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #f59e0b; /* Amber dot for starting state */
+  animation: pulse-starting 1s infinite;
+}
+
 @keyframes pulse {
   0%,
   100% {
@@ -169,6 +182,16 @@ body {
   }
   50% {
     opacity: 0.7;
+  }
+}
+
+@keyframes pulse-starting {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
   }
 }
 
