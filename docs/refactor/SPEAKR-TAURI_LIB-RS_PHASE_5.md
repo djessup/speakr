@@ -12,34 +12,47 @@
   - [ ] Create `commands/legacy.rs` for backward compatibility
 
 - [ ] **Extract validation commands**
-  - [ ] Move `validate_hot_key()` → `commands/validation.rs`
+  - [ ] Move `validate_hot_key_internal()` → `commands/validation.rs` (already extracted from
+        implementation)
+  - [ ] Keep `validate_hot_key()` wrapper in `lib.rs` (already implemented)
+  - [ ] Make internal function `pub(crate)` for module visibility
   - [ ] Add comprehensive hotkey format validation
   - [ ] Add input sanitization and error handling
   - [ ] Document validation rules and supported formats
 
 - [ ] **Extract system commands**
-  - [ ] Move `check_model_availability()` → `commands/system.rs`
-  - [ ] Move `set_auto_launch()` → `commands/system.rs`
+  - [ ] Extract `check_model_availability()` implementation → `commands/system.rs` as
+        `check_model_availability_internal()`
+  - [ ] Extract `set_auto_launch()` implementation → `commands/system.rs` as
+        `set_auto_launch_internal()`
+  - [ ] Keep `#[tauri::command]` wrappers in `lib.rs` that call `_internal` functions
+  - [ ] Make internal functions `pub(crate)` for module visibility
   - [ ] Add proper file system checks and error handling
   - [ ] Add system integration placeholders for auto-launch
 
 - [ ] **Extract legacy commands**
-  - [ ] Move `register_hot_key()` → `commands/legacy.rs`
-  - [ ] Move `greet()` → `commands/legacy.rs`
+  - [ ] Extract `register_hot_key()` implementation → `commands/legacy.rs` as
+        `register_hot_key_internal()`
+  - [ ] Extract `greet()` implementation → `commands/legacy.rs` as `greet_internal()`
+  - [ ] Keep `#[tauri::command]` wrappers in `lib.rs` that call `_internal` functions
+  - [ ] Make internal functions `pub(crate)` for module visibility
   - [ ] Add deprecation warnings if appropriate
   - [ ] Document backward compatibility requirements
 
 - [ ] **Create centralized command registration**
-  - [ ] Create command registration function in `commands/mod.rs`
-  - [ ] Group commands by conditional compilation (debug vs release)
-  - [ ] Create macro or helper for command handler generation
-  - [ ] Ensure all commands are properly registered
+  - [ ] Maintain existing command registration pattern in `run()` function
+  - [ ] Keep conditional compilation for debug vs release builds
+  - [ ] Ensure all `#[tauri::command]` wrappers remain in `lib.rs` for registration
+  - [ ] Create helper functions in `commands/mod.rs` for command organization if needed
+  - [ ] Document command registration requirements for future additions
 
 - [ ] **Finalize lib.rs cleanup**
-  - [ ] Remove all extracted functions and types
+  - [ ] Remove all extracted function implementations (`*_internal` functions moved to modules)
+  - [ ] Keep all `#[tauri::command]` wrappers that delegate to `*_internal` functions
+  - [ ] Note: `validate_hot_key_internal()` already exists and just needs to be moved
   - [ ] Keep only essential imports
   - [ ] Clean up module declarations
-  - [ ] Update `run()` function to use command registration helper
+  - [ ] Update `run()` function command registration as needed
   - [ ] Add comprehensive module documentation
 
 - [ ] **Final testing and validation**

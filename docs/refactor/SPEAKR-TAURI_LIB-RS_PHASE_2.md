@@ -20,15 +20,26 @@
   - [ ] Move entire `GlobalHotkeyService` struct → `services/hotkey.rs`
   - [ ] Move all impl blocks and methods
   - [ ] Add necessary imports (tauri, tracing, etc.)
-  - [ ] Move `register_global_hotkey()` command → `services/hotkey.rs`
-  - [ ] Move `unregister_global_hotkey()` command → `services/hotkey.rs`
-  - [ ] Add `pub` visibility to service and methods as needed
+  - [ ] Extract `register_global_hotkey()` implementation → `services/hotkey.rs` as
+        `register_global_hotkey_internal()`
+  - [ ] Extract `unregister_global_hotkey()` implementation → `services/hotkey.rs` as
+        `unregister_global_hotkey_internal()`
+  - [ ] Keep `#[tauri::command]` wrappers in `lib.rs` that call `_internal` functions
+  - [ ] Make service and methods `pub(crate)` for module visibility
 
 - [ ] **Extract BackendStatusService**
   - [ ] Move `BackendStatusService` struct → `services/status.rs`
   - [ ] Move all impl blocks and methods
-  - [ ] Move `get_backend_status()` command → `services/status.rs`
+  - [ ] Move `GLOBAL_BACKEND_SERVICE` static → `services/status.rs`
+  - [ ] Move `get_global_backend_service()` helper → `services/status.rs`
+  - [ ] Move `update_global_service_status()` helper → `services/status.rs`
+  - [ ] Extract `get_backend_status()` implementation → `services/status.rs` as
+        `get_backend_status_internal()`
+  - [ ] Extract `update_service_status()` implementation → `services/status.rs` as
+        `update_service_status_internal()`
+  - [ ] Keep `#[tauri::command]` wrappers in `lib.rs` that call `_internal` functions
   - [ ] Add necessary imports for Tauri AppHandle, etc.
+  - [ ] Make all functions `pub(crate)` for module visibility
   - [ ] Add `Default` implementation
 
 - [ ] **Update lib.rs imports and exports**

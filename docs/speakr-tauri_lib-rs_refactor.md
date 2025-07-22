@@ -38,7 +38,8 @@ responsibilities that should be separated for better maintainability.
   ```
 
 - **Benefits**: Reduces `lib.rs` by ~500 lines, improves test organization
-- **Note**: Integration tests can access internal modules via `speakr_tauri::module_name`
+- **Note**: Integration tests can access internal modules via `speakr_lib::module_name`
+  (speakr-tauri crate is named speakr_lib)
 
 ### 2. Extract Debug Functionality
 

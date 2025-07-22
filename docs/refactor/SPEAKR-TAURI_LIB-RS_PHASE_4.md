@@ -21,29 +21,37 @@
   - [ ] Move `add_debug_log()` function → `debug/storage.rs`
 
 - [ ] **Extract debug commands**
-  - [ ] Move `debug_test_audio_recording()` → `debug/commands.rs`
-  - [ ] Move `debug_start_recording()` → `debug/commands.rs`
-  - [ ] Move `debug_stop_recording()` → `debug/commands.rs`
-  - [ ] Move `debug_get_log_messages()` → `debug/commands.rs`
-  - [ ] Move `debug_clear_log_messages()` → `debug/commands.rs`
+  - [ ] Extract `debug_test_audio_recording()` implementation → `debug/commands.rs` as
+        `debug_test_audio_recording_internal()`
+  - [ ] Extract `debug_start_recording()` implementation → `debug/commands.rs` as
+        `debug_start_recording_internal()`
+  - [ ] Extract `debug_stop_recording()` implementation → `debug/commands.rs` as
+        `debug_stop_recording_internal()`
+  - [ ] Extract `debug_get_log_messages()` implementation → `debug/commands.rs` as
+        `debug_get_log_messages_internal()`
+  - [ ] Extract `debug_clear_log_messages()` implementation → `debug/commands.rs` as
+        `debug_clear_log_messages_internal()`
+  - [ ] Keep `#[tauri::command]` wrappers in `lib.rs` that call `_internal` functions
   - [ ] Move `get_debug_recordings_directory()` → `debug/commands.rs`
+  - [ ] Make all extracted functions `pub(crate)` for module visibility
 
 - [ ] **Create audio module structure**
   - [ ] Create `speakr-tauri/src/audio/` directory
   - [ ] Create `audio/mod.rs` with public interface
   - [ ] Create `audio/files.rs` for WAV file operations
   - [ ] Create `audio/recording.rs` for recording logic
-  - [ ] Create `audio/commands.rs` for audio Tauri commands
 
 - [ ] **Extract audio file operations**
   - [ ] Move `generate_audio_filename_with_timestamp()` → `audio/files.rs`
   - [ ] Move `save_audio_samples_to_wav_file()` → `audio/files.rs`
+  - [ ] Make functions `pub(crate)` for module visibility
   - [ ] Add proper WAV spec configuration
   - [ ] Add file path validation
 
 - [ ] **Extract audio recording functions**
   - [ ] Move `debug_record_audio_to_file()` → `audio/recording.rs`
   - [ ] Move `debug_record_real_audio_to_file()` → `audio/recording.rs`
+  - [ ] Make functions `pub(crate)` for module visibility
   - [ ] Ensure proper integration with speakr-core AudioRecorder
 
 - [ ] **Update conditional compilation**
