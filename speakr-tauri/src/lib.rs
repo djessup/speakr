@@ -7,24 +7,84 @@
 //! - Model file validation
 //! - System integration
 
-use speakr_types::{AppError, AppSettings, HotkeyConfig, HotkeyError};
+use speakr_types::{ AppError, AppSettings, HotkeyConfig, HotkeyError };
 use std::fs;
-use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
-use tauri::{AppHandle, Emitter};
-use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut};
-use tracing::{debug, error, info, warn};
+use std::path::{ Path, PathBuf };
+use std::sync::{ Arc, Mutex };
+use tauri::{ AppHandle, Emitter };
+use tauri_plugin_global_shortcut::{ Code, GlobalShortcutExt, Modifiers, Shortcut };
+use tracing::{ debug, error, info, warn };
+
+#[cfg(debug_assertions)]
+use serde::{ Deserialize, Serialize };
+
+#[cfg(debug_assertions)]
+use std::collections::VecDeque;
+
+#[cfg(debug_assertions)]
+use std::sync::LazyLock;
+
+// Debug-only log message types and storage
+#[cfg(debug_assertions)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum DebugLogLevel {
+    Trace,
+    Debug,
+    Info,
+    Warn,
+    Error,
+}
+
+#[cfg(debug_assertions)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DebugLogMessage {
+    pub timestamp: String,
+    pub level: DebugLogLevel,
+    pub target: String,
+    pub message: String,
+}
+
+#[cfg(debug_assertions)]
+static DEBUG_LOG_MESSAGES: LazyLock<Arc<Mutex<VecDeque<DebugLogMessage>>>> = LazyLock::new(||
+    Arc::new(Mutex::new(VecDeque::with_capacity(1000)))
+);
+
+#[cfg(debug_assertions)]
+impl DebugLogMessage {
+    pub fn new(level: DebugLogLevel, target: &str, message: &str) -> Self {
+        Self {
+            timestamp: chrono::Utc::now().format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string(),
+            level,
+            target: target.to_string(),
+            message: message.to_string(),
+        }
+    }
+}
+
+#[cfg(debug_assertions)]
+pub fn add_debug_log(level: DebugLogLevel, target: &str, message: &str) {
+    if let Ok(mut logs) = DEBUG_LOG_MESSAGES.lock() {
+        logs.push_back(DebugLogMessage::new(level, target, message));
+
+        // Keep only the last 1000 messages
+        while logs.len() > 1000 {
+            logs.pop_front();
+        }
+    }
+}
 
 // All types are now centralized in speakr-types crate
 
 /// Gets the settings file path in the app data directory.
 fn get_settings_path() -> Result<PathBuf, AppError> {
-    let app_data = dirs::config_dir()
+    let app_data = dirs
+        ::config_dir()
         .ok_or_else(|| AppError::Settings("Could not find config directory".to_string()))?;
 
     let speakr_dir = app_data.join("speakr");
     if !speakr_dir.exists() {
-        fs::create_dir_all(&speakr_dir)
+        fs
+            ::create_dir_all(&speakr_dir)
             .map_err(|e| AppError::FileSystem(format!("Failed to create config dir: {e}")))?;
     }
 
@@ -65,10 +125,7 @@ fn migrate_settings(mut settings: AppSettings) -> AppSettings {
         }
         _ => {
             // Invalid version - reset to defaults
-            warn!(
-                "Warning: Invalid settings version {}. Resetting to defaults.",
-                settings.version
-            );
+            warn!("Warning: Invalid settings version {}. Resetting to defaults.", settings.version);
             settings = AppSettings::default();
         }
     }
@@ -136,10 +193,12 @@ async fn load_settings() -> Result<AppSettings, AppError> {
 ///
 /// Returns error if the file cannot be read or parsed.
 fn try_load_settings_file(path: &PathBuf) -> Result<AppSettings, String> {
-    let content =
-        fs::read_to_string(path).map_err(|e| format!("Failed to read settings file: {e}"))?;
+    let content = fs
+        ::read_to_string(path)
+        .map_err(|e| format!("Failed to read settings file: {e}"))?;
 
-    let settings: AppSettings = serde_json::from_str(&content)
+    let settings: AppSettings = serde_json
+        ::from_str(&content)
         .map_err(|e| format!("Failed to parse settings JSON: {e}"))?;
 
     Ok(settings)
@@ -187,17 +246,16 @@ impl GlobalHotkeyService {
         }
 
         // Parse the shortcut string into Tauri's format
-        let shortcut = self.parse_shortcut(&config.shortcut).map_err(|e| {
-            HotkeyError::RegistrationFailed(format!("Invalid shortcut format: {e}"))
-        })?;
+        let shortcut = self
+            .parse_shortcut(&config.shortcut)
+            .map_err(|e| {
+                HotkeyError::RegistrationFailed(format!("Invalid shortcut format: {e}"))
+            })?;
 
         // Unregister existing shortcut if any
         if let Ok(mut current_instance) = self.current_shortcut_instance.lock() {
             if let Some(existing_shortcut) = current_instance.take() {
-                let _ = self
-                    .app_handle
-                    .global_shortcut()
-                    .unregister(existing_shortcut);
+                let _ = self.app_handle.global_shortcut().unregister(existing_shortcut);
             }
         }
 
@@ -221,9 +279,9 @@ impl GlobalHotkeyService {
             .global_shortcut()
             .register(shortcut)
             .map_err(|e| {
-                HotkeyError::ConflictDetected(format!(
-                    "Failed to register shortcut with system (conflict?): {e}"
-                ))
+                HotkeyError::ConflictDetected(
+                    format!("Failed to register shortcut with system (conflict?): {e}")
+                )
             })?;
 
         // Update internal state
@@ -245,8 +303,7 @@ impl GlobalHotkeyService {
     ///
     /// Returns `HotkeyError::NotFound` if no hot-key is currently registered
     pub async fn unregister_hotkey(&mut self) -> Result<(), HotkeyError> {
-        let mut current_instance = self
-            .current_shortcut_instance
+        let mut current_instance = self.current_shortcut_instance
             .lock()
             .map_err(|_| HotkeyError::RegistrationFailed("Failed to acquire lock".to_string()))?;
 
@@ -266,9 +323,7 @@ impl GlobalHotkeyService {
             info!("Successfully unregistered global hotkey");
             Ok(())
         } else {
-            Err(HotkeyError::NotFound(
-                "No hotkey currently registered".to_string(),
-            ))
+            Err(HotkeyError::NotFound("No hotkey currently registered".to_string()))
         }
     }
 
@@ -298,11 +353,7 @@ impl GlobalHotkeyService {
 
     /// Gets the currently registered hot-key shortcut
     pub fn current_shortcut(&self) -> Option<String> {
-        if let Ok(current) = self.current_shortcut.lock() {
-            current.clone()
-        } else {
-            None
-        }
+        if let Ok(current) = self.current_shortcut.lock() { current.clone() } else { None }
     }
 
     /// Parses a shortcut string into a Tauri Shortcut
@@ -412,9 +463,7 @@ async fn validate_hot_key(hot_key: String) -> Result<(), AppError> {
     let has_modifier = modifiers.iter().any(|m| hot_key.to_uppercase().contains(m));
 
     if !has_modifier {
-        return Err(AppError::HotKey(
-            "Hot-key must contain at least one modifier key".to_string(),
-        ));
+        return Err(AppError::HotKey("Hot-key must contain at least one modifier key".to_string()));
     }
 
     // Test if the shortcut can be parsed using the same logic as GlobalHotkeyService
@@ -433,7 +482,13 @@ async fn validate_hot_key(hot_key: String) -> Result<(), AppError> {
                 has_key = true;
                 // Check if it's a valid key
                 match part.to_lowercase().trim() {
-                    "space" | "enter" | "escape" | "backspace" | "delete" | "tab" | "`"
+                    | "space"
+                    | "enter"
+                    | "escape"
+                    | "backspace"
+                    | "delete"
+                    | "tab"
+                    | "`"
                     | "grave" => {}
                     k if k.len() == 1 && k.chars().all(|c| c.is_ascii_alphabetic()) => {}
                     _ => {
@@ -467,14 +522,13 @@ async fn check_model_availability(model_size: String) -> Result<bool, AppError> 
         "medium" => "ggml-medium.bin",
         "large" => "ggml-large.bin",
         _ => {
-            return Err(AppError::Settings(format!(
-                "Unknown model size: {model_size}"
-            )));
+            return Err(AppError::Settings(format!("Unknown model size: {model_size}")));
         }
     };
 
     // Check in models directory relative to the app
-    let models_dir = std::env::current_dir()
+    let models_dir = std::env
+        ::current_dir()
         .map_err(|e| AppError::FileSystem(format!("Failed to get current dir: {e}")))?
         .join("models");
 
@@ -510,10 +564,7 @@ async fn register_hot_key(hot_key: String) -> Result<(), AppError> {
 async fn register_global_hotkey(app_handle: AppHandle, config: HotkeyConfig) -> Result<(), String> {
     let mut service = GlobalHotkeyService::new(app_handle).map_err(|e| e.to_string())?;
 
-    service
-        .register_hotkey(&config)
-        .await
-        .map_err(|e| e.to_string())
+    service.register_hotkey(&config).await.map_err(|e| e.to_string())
 }
 
 /// Tauri command to unregister the current global hotkey
@@ -543,6 +594,126 @@ async fn set_auto_launch(enable: bool) -> Result<(), AppError> {
     // For now, just return success
     let _ = enable;
     Ok(())
+}
+
+/// Debug command to test audio recording functionality.
+///
+/// This command is only available in debug builds and provides
+/// a stub implementation for testing the audio recording interface.
+///
+/// # Returns
+///
+/// Returns a success message for testing purposes.
+///
+/// # Errors
+///
+/// Returns `AppError` if the operation fails.
+#[cfg(debug_assertions)]
+#[tauri::command]
+async fn debug_test_audio_recording() -> Result<String, AppError> {
+    use std::time::Duration;
+
+    add_debug_log(DebugLogLevel::Info, "speakr-debug", "Starting audio recording test");
+
+    // Simulate some processing time
+    tokio::time::sleep(Duration::from_millis(500)).await;
+
+    add_debug_log(DebugLogLevel::Debug, "speakr-core", "Mock audio recording completed");
+
+    // Return a mock success result
+    Ok("Audio recording test completed successfully! (Mock implementation)".to_string())
+}
+
+/// Debug command to start push-to-talk recording.
+///
+/// This command is only available in debug builds and provides
+/// a stub implementation for testing push-to-talk recording.
+///
+/// # Returns
+///
+/// Returns a success message for testing purposes.
+///
+/// # Errors
+///
+/// Returns `AppError` if the operation fails.
+#[cfg(debug_assertions)]
+#[tauri::command]
+async fn debug_start_recording() -> Result<String, AppError> {
+    info!("🎙️ Debug: Starting push-to-talk recording");
+    add_debug_log(DebugLogLevel::Info, "speakr-debug", "Push-to-talk recording started");
+
+    // TODO: Connect to speakr-core audio recording functionality
+    // For now, return a mock success result
+    Ok("Push-to-talk recording started (Mock implementation)".to_string())
+}
+
+/// Debug command to stop push-to-talk recording.
+///
+/// This command is only available in debug builds and provides
+/// a stub implementation for testing push-to-talk recording.
+///
+/// # Returns
+///
+/// Returns a success message for testing purposes.
+///
+/// # Errors
+///
+/// Returns `AppError` if the operation fails.
+#[cfg(debug_assertions)]
+#[tauri::command]
+async fn debug_stop_recording() -> Result<String, AppError> {
+    info!("⏹️ Debug: Stopping push-to-talk recording");
+    add_debug_log(DebugLogLevel::Info, "speakr-debug", "Push-to-talk recording stopped");
+
+    // TODO: Connect to speakr-core audio recording functionality
+    // For now, return a mock success result
+    Ok("Push-to-talk recording stopped (Mock implementation)".to_string())
+}
+
+/// Debug command to get recent log messages.
+///
+/// This command is only available in debug builds and returns
+/// the collected log messages for display in the debug console.
+///
+/// # Returns
+///
+/// Returns a vector of log messages.
+///
+/// # Errors
+///
+/// Returns `AppError` if the operation fails.
+#[cfg(debug_assertions)]
+#[tauri::command]
+async fn debug_get_log_messages() -> Result<Vec<DebugLogMessage>, AppError> {
+    if let Ok(logs) = DEBUG_LOG_MESSAGES.lock() {
+        Ok(logs.iter().cloned().collect())
+    } else {
+        Err(AppError::Settings("Failed to access log messages".to_string()))
+    }
+}
+
+/// Debug command to clear all log messages.
+///
+/// This command is only available in debug builds and clears
+/// the collected log messages from memory.
+///
+/// # Returns
+///
+/// Returns `Ok(())` on success.
+///
+/// # Errors
+///
+/// Returns `AppError` if the operation fails.
+#[cfg(debug_assertions)]
+#[tauri::command]
+async fn debug_clear_log_messages() -> Result<(), AppError> {
+    if let Ok(mut logs) = DEBUG_LOG_MESSAGES.lock() {
+        logs.clear();
+        add_debug_log(DebugLogLevel::Info, "speakr-debug", "Log messages cleared");
+        Ok(())
+    } else {
+        Err(AppError::Settings("Failed to clear log messages".to_string()))
+    }
 }
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
@@ -599,11 +770,12 @@ fn validate_settings_directory_permissions(dir_path: &Path) -> Result<(), AppErr
 /// Returns `AppError` if the settings cannot be saved.
 pub async fn save_settings_to_dir(
     settings: &AppSettings,
-    settings_dir: &PathBuf,
+    settings_dir: &PathBuf
 ) -> Result<(), AppError> {
     // Ensure directory exists
     if !settings_dir.exists() {
-        fs::create_dir_all(settings_dir)
+        fs
+            ::create_dir_all(settings_dir)
             .map_err(|e| AppError::FileSystem(format!("Failed to create settings dir: {e}")))?;
     }
 
@@ -614,24 +786,28 @@ pub async fn save_settings_to_dir(
     let mut settings_to_save = settings.clone();
     settings_to_save.version = 1;
 
-    let json = serde_json::to_string_pretty(&settings_to_save)
+    let json = serde_json
+        ::to_string_pretty(&settings_to_save)
         .map_err(|e| AppError::Settings(format!("Failed to serialize settings: {e}")))?;
 
     // Atomic write: write to temporary file first, then rename
     let temp_path = settings_path.with_extension("json.tmp");
 
     // Write to temporary file
-    fs::write(&temp_path, &json)
+    fs
+        ::write(&temp_path, &json)
         .map_err(|e| AppError::FileSystem(format!("Failed to write temp settings file: {e}")))?;
 
     // Create backup of existing file if it exists
     if settings_path.exists() {
-        fs::copy(&settings_path, &backup_path)
+        fs
+            ::copy(&settings_path, &backup_path)
             .map_err(|e| AppError::FileSystem(format!("Failed to create settings backup: {e}")))?;
     }
 
     // Atomically move temp file to final location
-    fs::rename(&temp_path, &settings_path)
+    fs
+        ::rename(&temp_path, &settings_path)
         .map_err(|e| AppError::FileSystem(format!("Failed to move temp settings file: {e}")))?;
 
     Ok(())
@@ -682,8 +858,11 @@ async fn load_settings_from_dir(settings_dir: &PathBuf) -> Result<AppSettings, A
                         let migrated_settings = migrate_settings(backup_settings);
 
                         // Save the recovered settings to main file
-                        if let Err(save_error) =
-                            save_settings_to_dir(&migrated_settings, settings_dir).await
+                        if
+                            let Err(save_error) = save_settings_to_dir(
+                                &migrated_settings,
+                                settings_dir
+                            ).await
                         {
                             error!("Warning: Failed to save recovered settings: {save_error}");
                         }
@@ -696,14 +875,20 @@ async fn load_settings_from_dir(settings_dir: &PathBuf) -> Result<AppSettings, A
                         // Move corrupt files aside for debugging
                         let _ = fs::rename(
                             &settings_path,
-                            settings_path.with_extension("json.corrupt"),
+                            settings_path.with_extension("json.corrupt")
                         );
-                        let _ =
-                            fs::rename(&backup_path, backup_path.with_extension("json.corrupt"));
+                        let _ = fs::rename(
+                            &backup_path,
+                            backup_path.with_extension("json.corrupt")
+                        );
 
                         // Return defaults and save them
                         let defaults = AppSettings::default();
-                        if let Err(save_error) = save_settings_to_dir(&defaults, settings_dir).await
+                        if
+                            let Err(save_error) = save_settings_to_dir(
+                                &defaults,
+                                settings_dir
+                            ).await
                         {
                             error!("Warning: Failed to save default settings: {save_error}");
                         }
@@ -734,20 +919,62 @@ pub fn run() {
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
-        .invoke_handler(
-            tauri::generate_handler![
-                greet,
-                save_settings,
-                load_settings,
-                validate_hot_key,
-                check_model_availability,
-                register_hot_key,
-                set_auto_launch,
-                register_global_hotkey,
-                unregister_global_hotkey
-            ]
-        )
+        .invoke_handler({
+            #[cfg(debug_assertions)]
+            {
+                tauri::generate_handler![
+                    greet,
+                    save_settings,
+                    load_settings,
+                    validate_hot_key,
+                    check_model_availability,
+                    register_hot_key,
+                    set_auto_launch,
+                    register_global_hotkey,
+                    unregister_global_hotkey,
+                    debug_test_audio_recording,
+                    debug_start_recording,
+                    debug_stop_recording,
+                    debug_get_log_messages,
+                    debug_clear_log_messages
+                ]
+            }
+            #[cfg(not(debug_assertions))]
+            {
+                tauri::generate_handler![
+                    greet,
+                    save_settings,
+                    load_settings,
+                    validate_hot_key,
+                    check_model_availability,
+                    register_hot_key,
+                    set_auto_launch,
+                    register_global_hotkey,
+                    unregister_global_hotkey
+                ]
+            }
+        })
         .setup(|app| {
+            // Add initial debug log messages
+            #[cfg(debug_assertions)]
+            {
+                add_debug_log(
+                    DebugLogLevel::Info,
+                    "speakr-tauri",
+                    "Application starting in debug mode"
+                );
+                add_debug_log(
+                    DebugLogLevel::Debug,
+                    "speakr-tauri",
+                    "Debug logging system initialized"
+                );
+                add_debug_log(
+                    DebugLogLevel::Info,
+                    "speakr-tauri",
+                    "Debug panel available via toggle button"
+                );
+            }
+
             // Register default hotkey on startup
             let app_handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
@@ -759,6 +986,14 @@ pub fn run() {
                             default_config.shortcut,
                             e
                         );
+
+                        #[cfg(debug_assertions)]
+                        add_debug_log(
+                            DebugLogLevel::Warn,
+                            "speakr-tauri",
+                            &format!("Failed to register default hotkey: {e}")
+                        );
+
                         warn!("💡 You can change the hotkey in Settings to avoid conflicts");
 
                         // Try a fallback hotkey if the default fails
@@ -773,14 +1008,36 @@ pub fn run() {
                                 fallback_config.shortcut,
                                 e2
                             );
+
+                            #[cfg(debug_assertions)]
+                            add_debug_log(
+                                DebugLogLevel::Error,
+                                "speakr-tauri",
+                                &format!("Fallback hotkey also failed: {e2}")
+                            );
+
                             warn!(
                                 "🔧 App will start without global hotkey - configure one in Settings"
                             );
                         } else {
                             info!("✅ Using fallback hotkey: {}", fallback_config.shortcut);
+
+                            #[cfg(debug_assertions)]
+                            add_debug_log(
+                                DebugLogLevel::Info,
+                                "speakr-tauri",
+                                &format!("Using fallback hotkey: {}", fallback_config.shortcut)
+                            );
                         }
                     } else {
                         info!("✅ Default hotkey registered: {}", default_config.shortcut);
+
+                        #[cfg(debug_assertions)]
+                        add_debug_log(
+                            DebugLogLevel::Info,
+                            "speakr-tauri",
+                            &format!("Default hotkey registered: {}", default_config.shortcut)
+                        );
                     }
                 }
             });
@@ -825,8 +1082,9 @@ mod tests {
         std::fs::write(&temp_settings_path, json).expect("Should write test file");
 
         // Load and verify using our helper function
-        let loaded_settings =
-            try_load_settings_file(&temp_settings_path).expect("Should load test settings");
+        let loaded_settings = try_load_settings_file(&temp_settings_path).expect(
+            "Should load test settings"
+        );
         assert_eq!(loaded_settings, test_settings);
 
         // Test migration works
@@ -855,9 +1113,7 @@ mod tests {
     async fn test_atomic_write_creates_backup() {
         // Create initial settings
         let initial_settings = AppSettings::default();
-        save_settings(initial_settings)
-            .await
-            .expect("Initial save should work");
+        save_settings(initial_settings).await.expect("Initial save should work");
 
         // Verify main file exists
         let settings_path = get_settings_path().expect("Should get settings path");
@@ -870,9 +1126,7 @@ mod tests {
             model_size: "small".to_string(),
             auto_launch: true,
         };
-        save_settings(updated_settings.clone())
-            .await
-            .expect("Updated save should work");
+        save_settings(updated_settings.clone()).await.expect("Updated save should work");
 
         // Verify backup was created
         let backup_path = get_settings_backup_path().expect("Should get backup path");
@@ -893,43 +1147,33 @@ mod tests {
 
         // Create good settings - first save creates main file, no backup yet
         let good_settings = AppSettings::default();
-        save_settings_to_dir(&good_settings, &settings_dir)
-            .await
-            .expect("Should save initial");
+        save_settings_to_dir(&good_settings, &settings_dir).await.expect("Should save initial");
 
         let settings_path = settings_dir.join("settings.json");
         let backup_path = settings_dir.join("settings.json.backup");
 
         // First save doesn't create backup (no existing file to backup)
-        assert!(
-            !backup_path.exists(),
-            "Backup should NOT exist after first save"
-        );
+        assert!(!backup_path.exists(), "Backup should NOT exist after first save");
 
         // Second save creates backup of the existing file
-        save_settings_to_dir(&good_settings, &settings_dir)
-            .await
-            .expect("Should save second time");
+        save_settings_to_dir(&good_settings, &settings_dir).await.expect("Should save second time");
 
         // NOW backup should exist (created from the existing file during second save)
-        assert!(
-            backup_path.exists(),
-            "Backup should exist after second save"
-        );
+        assert!(backup_path.exists(), "Backup should exist after second save");
 
         // Corrupt the main file (backup should exist after second save)
         std::fs::write(&settings_path, "invalid json").expect("Should corrupt main file");
 
         // Load should recover from backup using isolated function
-        let recovered = load_settings_from_dir(&settings_dir)
-            .await
-            .expect("Should recover from backup");
+        let recovered = load_settings_from_dir(&settings_dir).await.expect(
+            "Should recover from backup"
+        );
         assert_eq!(recovered, good_settings);
 
         // Verify main file was restored
-        let reloaded = load_settings_from_dir(&settings_dir)
-            .await
-            .expect("Should load restored settings");
+        let reloaded = load_settings_from_dir(&settings_dir).await.expect(
+            "Should load restored settings"
+        );
         assert_eq!(reloaded, good_settings);
     }
 
@@ -943,23 +1187,19 @@ mod tests {
         let fake_backup_path = temp_dir.path().join("settings.json.backup");
 
         // Create both files with invalid content
-        std::fs::write(&fake_settings_path, "invalid json")
+        std::fs
+            ::write(&fake_settings_path, "invalid json")
             .expect("Should write corrupt main file");
-        std::fs::write(&fake_backup_path, "also invalid")
+        std::fs
+            ::write(&fake_backup_path, "also invalid")
             .expect("Should write corrupt backup file");
 
         // Use the helper function directly since we can't easily override the paths in the command
         let load_result_main = try_load_settings_file(&fake_settings_path);
-        assert!(
-            load_result_main.is_err(),
-            "Should fail to load corrupt main file"
-        );
+        assert!(load_result_main.is_err(), "Should fail to load corrupt main file");
 
         let load_result_backup = try_load_settings_file(&fake_backup_path);
-        assert!(
-            load_result_backup.is_err(),
-            "Should fail to load corrupt backup file"
-        );
+        assert!(load_result_backup.is_err(), "Should fail to load corrupt backup file");
 
         // In the real scenario, this would fall back to defaults
         // The load_settings command handles this logic
@@ -972,7 +1212,7 @@ mod tests {
             "CmdOrCtrl+Alt+Space".to_string(),
             "Ctrl+Shift+F".to_string(),
             "Alt+`".to_string(),
-            "CMD+SPACE".to_string(), // Legacy format support
+            "CMD+SPACE".to_string() // Legacy format support
         ];
 
         // Act & Assert
@@ -985,9 +1225,9 @@ mod tests {
     #[tokio::test]
     async fn test_validate_hot_key_failures() {
         let invalid_keys = vec![
-            "".to_string(),      // Empty
+            "".to_string(), // Empty
             "Space".to_string(), // No modifier
-            "A+B".to_string(),   // No modifier keys
+            "A+B".to_string() // No modifier keys
         ];
 
         for key in invalid_keys {
@@ -1166,8 +1406,9 @@ mod tests {
         );
 
         // Verify the file was written correctly
-        let loaded =
-            try_load_settings_file(&temp_settings_path).expect("Should load saved settings");
+        let loaded = try_load_settings_file(&temp_settings_path).expect(
+            "Should load saved settings"
+        );
         assert_eq!(loaded, settings);
     }
 
@@ -1203,12 +1444,10 @@ mod tests {
         };
 
         // These functions should accept directory paths to enable test isolation
-        save_settings_to_dir(&test_settings, &settings_dir)
-            .await
-            .expect("Should save to test dir");
-        let loaded = load_settings_from_dir(&settings_dir)
-            .await
-            .expect("Should load from test dir");
+        save_settings_to_dir(&test_settings, &settings_dir).await.expect("Should save to test dir");
+        let loaded = load_settings_from_dir(&settings_dir).await.expect(
+            "Should load from test dir"
+        );
 
         assert_eq!(loaded, test_settings);
     }
@@ -1223,9 +1462,7 @@ mod tests {
 
         // Create good settings and backup
         let good_settings = AppSettings::default();
-        save_settings_to_dir(&good_settings, &settings_dir)
-            .await
-            .expect("Should save initial");
+        save_settings_to_dir(&good_settings, &settings_dir).await.expect("Should save initial");
 
         let settings_path = settings_dir.join("settings.json");
         let _backup_path = settings_dir.join("settings.json.backup");
@@ -1234,9 +1471,7 @@ mod tests {
         std::fs::write(&settings_path, "invalid json").expect("Should corrupt main file");
 
         // Load should recover from backup
-        let recovered = load_settings_from_dir(&settings_dir)
-            .await
-            .expect("Should recover");
+        let recovered = load_settings_from_dir(&settings_dir).await.expect("Should recover");
         assert_eq!(recovered, good_settings);
     }
 }

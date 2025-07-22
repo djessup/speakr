@@ -1,6 +1,9 @@
 mod app;
 mod settings;
 
+#[cfg(debug_assertions)]
+mod debug;
+
 use app::*;
 use leptos::prelude::*;
 use wasm_bindgen::prelude::*;

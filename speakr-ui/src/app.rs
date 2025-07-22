@@ -3,6 +3,9 @@ use wasm_bindgen::prelude::*;
 
 use crate::settings::SettingsPanel;
 
+#[cfg(debug_assertions)]
+use crate::debug::DebugPanel;
+
 #[wasm_bindgen]
 extern "C" {
     #[wasm_bindgen(js_namespace = ["window", "__TAURI__", "core"])]
@@ -13,6 +16,9 @@ extern "C" {
 /// This is a modern, clean interface for Speakr dictation settings.
 #[component]
 pub fn App() -> impl IntoView {
+    #[cfg(debug_assertions)]
+    let (show_debug_panel, set_show_debug_panel) = signal(false);
+
     view! {
         <div class="app">
             // Header with app branding
@@ -29,6 +35,26 @@ pub fn App() -> impl IntoView {
                             <div class="status-dot"></div>
                             <span>"Ready"</span>
                         </div>
+
+                        // Debug button only visible in debug builds
+                        {move || {
+                            #[cfg(debug_assertions)]
+                            {
+                                view! {
+                                    <button
+                                        class="debug-toggle-btn"
+                                        on:click=move |_| set_show_debug_panel.update(|show| *show = !*show)
+                                        title="Toggle Debug Panel (Debug Build Only)"
+                                    >
+                                        {move || if show_debug_panel.get() { "🛠️ Hide Debug" } else { "🛠️ Debug" }}
+                                    </button>
+                                }.into_any()
+                            }
+                            #[cfg(not(debug_assertions))]
+                            {
+                                view! { <div></div> }.into_any()
+                            }
+                        }}
                     </div>
                 </div>
             </header>
@@ -36,7 +62,20 @@ pub fn App() -> impl IntoView {
             // Main content area
             <main class="main-content">
                 <div class="content-container">
-                    <SettingsPanel />
+                    {move || {
+                        #[cfg(debug_assertions)]
+                        {
+                            if show_debug_panel.get() {
+                                view! { <DebugPanel /> }.into_any()
+                            } else {
+                                view! { <SettingsPanel /> }.into_any()
+                            }
+                        }
+                        #[cfg(not(debug_assertions))]
+                        {
+                            view! { <SettingsPanel /> }.into_any()
+                        }
+                    }}
                 </div>
             </main>
 

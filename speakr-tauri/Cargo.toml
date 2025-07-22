@@ -18,16 +18,22 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-speakr-types = { path = "../speakr-types" }      # Shared data types
+speakr-types = { path = "../speakr-types" } # Shared data types
 tauri = { version = "2", features = [] }
 tauri-plugin-opener = "2"
-tauri-plugin-global-shortcut = "2"               # Global hot-key registration support
-thiserror = "1.0"                                # Error handling for hot-key operations
+tauri-plugin-global-shortcut = "2" # Global hot-key registration support
+thiserror = "1.0" # Error handling for hot-key operations
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-dirs = "5.0"                                     # Cross-platform directory access
+dirs = "5.0" # Cross-platform directory access
 tauri-plugin-store = "2"
 tracing = "0.1.41"
+tokio = { version = "1", features = [
+    "time",
+] } # Async runtime for debug commands
+chrono = { version = "0.4", features = [
+    "serde",
+] } # Timestamps for debug log messages
 
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
