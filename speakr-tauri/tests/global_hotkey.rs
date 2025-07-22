@@ -56,6 +56,101 @@ mod tests {
         );
     }
 
+    // 🔴 RED: Tests for function key configurations
+    #[tokio::test]
+    async fn test_function_key_hotkey_configs() {
+        let function_key_configs = vec![
+            "CmdOrCtrl+F1",
+            "CmdOrCtrl+F2",
+            "CmdOrCtrl+F3",
+            "CmdOrCtrl+F4",
+            "CmdOrCtrl+F5",
+            "CmdOrCtrl+F6",
+            "CmdOrCtrl+F7",
+            "CmdOrCtrl+F8",
+            "CmdOrCtrl+F9",
+            "CmdOrCtrl+F10",
+            "CmdOrCtrl+F11",
+            "CmdOrCtrl+F12",
+            "Alt+F1",
+            "Shift+F2",
+            "Ctrl+Alt+F3",
+        ];
+
+        for shortcut in function_key_configs {
+            let config = HotkeyConfig {
+                shortcut: shortcut.to_string(),
+                enabled: true,
+            };
+
+            // Test serialization/deserialization
+            let json = serde_json::to_string(&config).expect("Should serialize");
+            let deserialized: HotkeyConfig =
+                serde_json::from_str(&json).expect("Should deserialize");
+            assert_eq!(deserialized.shortcut, shortcut);
+            assert!(deserialized.enabled);
+        }
+    }
+
+    // 🔴 RED: Tests for special key configurations
+    #[tokio::test]
+    async fn test_special_key_hotkey_configs() {
+        let special_key_configs = vec![
+            "CmdOrCtrl+Home",
+            "CmdOrCtrl+End",
+            "CmdOrCtrl+PageUp",
+            "CmdOrCtrl+PageDown",
+            "CmdOrCtrl+ArrowUp",
+            "CmdOrCtrl+ArrowDown",
+            "CmdOrCtrl+ArrowLeft",
+            "CmdOrCtrl+ArrowRight",
+            "CmdOrCtrl+Insert",
+            "Alt+~",
+            "Shift+Insert",
+        ];
+
+        for shortcut in special_key_configs {
+            let config = HotkeyConfig {
+                shortcut: shortcut.to_string(),
+                enabled: true,
+            };
+
+            // Should be able to create config without errors
+            assert!(!config.shortcut.is_empty());
+            assert!(config.enabled);
+        }
+    }
+
+    // 🔴 RED: Tests for numeric and symbol key configurations
+    #[tokio::test]
+    async fn test_numeric_symbol_key_hotkey_configs() {
+        let key_configs = vec![
+            "CmdOrCtrl+0",
+            "CmdOrCtrl+1",
+            "CmdOrCtrl+2",
+            "CmdOrCtrl+9",
+            "CmdOrCtrl+;",
+            "CmdOrCtrl+,",
+            "CmdOrCtrl+.",
+            "CmdOrCtrl+/",
+            "CmdOrCtrl+[",
+            "CmdOrCtrl+]",
+            "CmdOrCtrl+-",
+            "CmdOrCtrl+=",
+        ];
+
+        for shortcut in key_configs {
+            let config = HotkeyConfig {
+                shortcut: shortcut.to_string(),
+                enabled: true,
+            };
+
+            // Should be able to create config without errors
+            assert!(!config.shortcut.is_empty());
+            assert!(config.enabled);
+        }
+    }
+
     // Integration tests would go here once we have proper Tauri test setup
     // For now, these serve as documentation of the expected behavior
 

@@ -8,23 +8,29 @@
 //! - System integration
 
 use speakr_types::{
-    AppError, AppSettings, BackendStatus, HotkeyConfig, HotkeyError, ServiceStatus, StatusUpdate,
+    AppError,
+    AppSettings,
+    BackendStatus,
+    HotkeyConfig,
+    HotkeyError,
+    ServiceStatus,
+    StatusUpdate,
 };
 use std::fs;
-use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
-use tauri::{AppHandle, Emitter};
-use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut};
-use tracing::{debug, error, info, warn};
+use std::path::{ Path, PathBuf };
+use std::sync::{ Arc, Mutex };
+use tauri::{ AppHandle, Emitter };
+use tauri_plugin_global_shortcut::{ GlobalShortcutExt, Shortcut };
+use tracing::{ debug, error, info, warn };
 
 // Add import for audio functionality
-use speakr_core::audio::{AudioRecorder, RecordingConfig};
+use speakr_core::audio::{ AudioRecorder, RecordingConfig };
 
 // Add import for WAV file writing
-use hound::{WavSpec, WavWriter};
+use hound::{ WavSpec, WavWriter };
 
 #[cfg(debug_assertions)]
-use serde::{Deserialize, Serialize};
+use serde::{ Deserialize, Serialize };
 
 #[cfg(debug_assertions)]
 use std::collections::VecDeque;
@@ -61,28 +67,30 @@ struct DebugRecordingState {
 }
 
 #[cfg(debug_assertions)]
-static DEBUG_LOG_MESSAGES: LazyLock<Arc<Mutex<VecDeque<DebugLogMessage>>>> =
-    LazyLock::new(|| Arc::new(Mutex::new(VecDeque::with_capacity(1000))));
+static DEBUG_LOG_MESSAGES: LazyLock<Arc<Mutex<VecDeque<DebugLogMessage>>>> = LazyLock::new(||
+    Arc::new(Mutex::new(VecDeque::with_capacity(1000)))
+);
 
 #[cfg(debug_assertions)]
 static DEBUG_RECORDING_STATE: LazyLock<Arc<Mutex<DebugRecordingState>>> = LazyLock::new(|| {
-    Arc::new(Mutex::new(DebugRecordingState {
-        recorder: None,
-        start_time: None,
-    }))
+    Arc::new(
+        Mutex::new(DebugRecordingState {
+            recorder: None,
+            start_time: None,
+        })
+    )
 });
 
 // Global backend status service instance
-static GLOBAL_BACKEND_SERVICE: LazyLock<Arc<Mutex<BackendStatusService>>> =
-    LazyLock::new(|| Arc::new(Mutex::new(BackendStatusService::new())));
+static GLOBAL_BACKEND_SERVICE: LazyLock<Arc<Mutex<BackendStatusService>>> = LazyLock::new(||
+    Arc::new(Mutex::new(BackendStatusService::new()))
+);
 
 #[cfg(debug_assertions)]
 impl DebugLogMessage {
     pub fn new(level: DebugLogLevel, target: &str, message: &str) -> Self {
         Self {
-            timestamp: chrono::Utc::now()
-                .format("%Y-%m-%dT%H:%M:%S%.3fZ")
-                .to_string(),
+            timestamp: chrono::Utc::now().format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string(),
             level,
             target: target.to_string(),
             message: message.to_string(),
@@ -105,13 +113,19 @@ pub fn add_debug_log(level: DebugLogLevel, target: &str, message: &str) {
 // All types are now centralized in speakr-types crate
 
 /// Gets the settings file path in the app data directory.
-fn get_settings_path() -> Result<PathBuf, AppError> {
-    let app_data = dirs::config_dir()
+/// Gets the settings file path in the app data directory.
+///
+/// # Internal API
+/// This function is only intended for internal use and testing.
+pub fn get_settings_path() -> Result<PathBuf, AppError> {
+    let app_data = dirs
+        ::config_dir()
         .ok_or_else(|| AppError::Settings("Could not find config directory".to_string()))?;
 
     let speakr_dir = app_data.join("speakr");
     if !speakr_dir.exists() {
-        fs::create_dir_all(&speakr_dir)
+        fs
+            ::create_dir_all(&speakr_dir)
             .map_err(|e| AppError::FileSystem(format!("Failed to create config dir: {e}")))?;
     }
 
@@ -123,7 +137,11 @@ fn get_settings_path() -> Result<PathBuf, AppError> {
 
 /// Gets the backup settings file path for corruption recovery.
 #[allow(dead_code)] // Used in tests
-fn get_settings_backup_path() -> Result<PathBuf, AppError> {
+/// Gets the backup settings file path for corruption recovery.
+///
+/// # Internal API
+/// This function is only intended for internal use and testing.
+pub fn get_settings_backup_path() -> Result<PathBuf, AppError> {
     let settings_path = get_settings_path()?;
     Ok(settings_path.with_extension("json.backup"))
 }
@@ -137,7 +155,11 @@ fn get_settings_backup_path() -> Result<PathBuf, AppError> {
 /// # Returns
 ///
 /// Returns the migrated settings with updated version number.
-fn migrate_settings(mut settings: AppSettings) -> AppSettings {
+/// Migrates settings from older versions to the current version.
+///
+/// # Internal API
+/// This function is only intended for internal use and testing.
+pub fn migrate_settings(mut settings: AppSettings) -> AppSettings {
     match settings.version {
         0 => {
             // Migrate from version 0 to 1 - no changes needed for now
@@ -152,10 +174,7 @@ fn migrate_settings(mut settings: AppSettings) -> AppSettings {
         }
         _ => {
             // Invalid version - reset to defaults
-            warn!(
-                "Warning: Invalid settings version {}. Resetting to defaults.",
-                settings.version
-            );
+            warn!("Warning: Invalid settings version {}. Resetting to defaults.", settings.version);
             settings = AppSettings::default();
         }
     }
@@ -222,11 +241,17 @@ async fn load_settings() -> Result<AppSettings, AppError> {
 /// # Errors
 ///
 /// Returns error if the file cannot be read or parsed.
-fn try_load_settings_file(path: &PathBuf) -> Result<AppSettings, String> {
-    let content =
-        fs::read_to_string(path).map_err(|e| format!("Failed to read settings file: {e}"))?;
+/// Attempts to load settings from a specific file path.
+///
+/// # Internal API
+/// This function is only intended for internal use and testing.
+pub fn try_load_settings_file(path: &PathBuf) -> Result<AppSettings, String> {
+    let content = fs
+        ::read_to_string(path)
+        .map_err(|e| format!("Failed to read settings file: {e}"))?;
 
-    let settings: AppSettings = serde_json::from_str(&content)
+    let settings: AppSettings = serde_json
+        ::from_str(&content)
         .map_err(|e| format!("Failed to parse settings JSON: {e}"))?;
 
     Ok(settings)
@@ -273,18 +298,17 @@ impl GlobalHotkeyService {
             return Ok(());
         }
 
-        // Parse the shortcut string into Tauri's format
-        let shortcut = self.parse_shortcut(&config.shortcut).map_err(|e| {
-            HotkeyError::RegistrationFailed(format!("Invalid shortcut format: {e}"))
-        })?;
+        // 🟢 GREEN: Use Tauri's native shortcut parsing instead of custom implementation
+        let shortcut = config.shortcut
+            .parse::<Shortcut>()
+            .map_err(|e| {
+                HotkeyError::RegistrationFailed(format!("Invalid shortcut format: {e}"))
+            })?;
 
         // Unregister existing shortcut if any
         if let Ok(mut current_instance) = self.current_shortcut_instance.lock() {
             if let Some(existing_shortcut) = current_instance.take() {
-                let _ = self
-                    .app_handle
-                    .global_shortcut()
-                    .unregister(existing_shortcut);
+                let _ = self.app_handle.global_shortcut().unregister(existing_shortcut);
             }
         }
 
@@ -308,9 +332,9 @@ impl GlobalHotkeyService {
             .global_shortcut()
             .register(shortcut)
             .map_err(|e| {
-                HotkeyError::ConflictDetected(format!(
-                    "Failed to register shortcut with system (conflict?): {e}"
-                ))
+                HotkeyError::ConflictDetected(
+                    format!("Failed to register shortcut with system (conflict?): {e}")
+                )
             })?;
 
         // Update internal state
@@ -332,8 +356,7 @@ impl GlobalHotkeyService {
     ///
     /// Returns `HotkeyError::NotFound` if no hot-key is currently registered
     pub async fn unregister_hotkey(&mut self) -> Result<(), HotkeyError> {
-        let mut current_instance = self
-            .current_shortcut_instance
+        let mut current_instance = self.current_shortcut_instance
             .lock()
             .map_err(|_| HotkeyError::RegistrationFailed("Failed to acquire lock".to_string()))?;
 
@@ -353,9 +376,7 @@ impl GlobalHotkeyService {
             info!("Successfully unregistered global hotkey");
             Ok(())
         } else {
-            Err(HotkeyError::NotFound(
-                "No hotkey currently registered".to_string(),
-            ))
+            Err(HotkeyError::NotFound("No hotkey currently registered".to_string()))
         }
     }
 
@@ -385,93 +406,7 @@ impl GlobalHotkeyService {
 
     /// Gets the currently registered hot-key shortcut
     pub fn current_shortcut(&self) -> Option<String> {
-        if let Ok(current) = self.current_shortcut.lock() {
-            current.clone()
-        } else {
-            None
-        }
-    }
-
-    /// Parses a shortcut string into a Tauri Shortcut
-    ///
-    /// # Arguments
-    ///
-    /// * `shortcut_str` - The shortcut string (e.g. "CmdOrCtrl+Alt+Space")
-    ///
-    /// # Errors
-    ///
-    /// Returns error if the shortcut format is invalid
-    fn parse_shortcut(&self, shortcut_str: &str) -> Result<Shortcut, String> {
-        let parts: Vec<&str> = shortcut_str.split('+').collect();
-
-        if parts.is_empty() {
-            return Err("Empty shortcut string".to_string());
-        }
-
-        let mut modifiers = Modifiers::empty();
-        let mut key_part = None;
-
-        for part in &parts {
-            match part.to_lowercase().as_str() {
-                "cmd" | "cmdorctrl" => {
-                    modifiers |= Modifiers::SUPER;
-                }
-                "ctrl" => {
-                    modifiers |= Modifiers::CONTROL;
-                }
-                "alt" | "option" => {
-                    modifiers |= Modifiers::ALT;
-                }
-                "shift" => {
-                    modifiers |= Modifiers::SHIFT;
-                }
-                _ => {
-                    key_part = Some(*part);
-                }
-            }
-        }
-
-        let key = key_part.ok_or("No key specified in shortcut")?;
-        let code = match key.to_lowercase().as_str() {
-            "space" => Code::Space,
-            "enter" => Code::Enter,
-            "escape" => Code::Escape,
-            "backspace" => Code::Backspace,
-            "delete" => Code::Delete,
-            "tab" => Code::Tab,
-            "`" | "grave" => Code::Backquote,
-            "a" => Code::KeyA,
-            "b" => Code::KeyB,
-            "c" => Code::KeyC,
-            "d" => Code::KeyD,
-            "e" => Code::KeyE,
-            "f" => Code::KeyF,
-            "g" => Code::KeyG,
-            "h" => Code::KeyH,
-            "i" => Code::KeyI,
-            "j" => Code::KeyJ,
-            "k" => Code::KeyK,
-            "l" => Code::KeyL,
-            "m" => Code::KeyM,
-            "n" => Code::KeyN,
-            "o" => Code::KeyO,
-            "p" => Code::KeyP,
-            "q" => Code::KeyQ,
-            "r" => Code::KeyR,
-            "s" => Code::KeyS,
-            "t" => Code::KeyT,
-            "u" => Code::KeyU,
-            "v" => Code::KeyV,
-            "w" => Code::KeyW,
-            "x" => Code::KeyX,
-            "y" => Code::KeyY,
-            "z" => Code::KeyZ,
-            _ => {
-                return Err(format!("Unsupported key: {key}"));
-            }
-        };
-
-        Ok(Shortcut::new(Some(modifiers), code))
+        if let Ok(current) = self.current_shortcut.lock() { current.clone() } else { None }
     }
 }
 
@@ -488,8 +423,11 @@ impl GlobalHotkeyService {
 /// # Errors
 ///
 /// Returns `AppError::HotKey` if the hot-key is invalid.
-#[tauri::command]
-async fn validate_hot_key(hot_key: String) -> Result<(), AppError> {
+/// Internal hot-key validation logic using Tauri's native shortcut parsing.
+///
+/// # Internal API
+/// This function is only intended for internal use and testing.
+pub async fn validate_hot_key_internal(hot_key: String) -> Result<(), AppError> {
     if hot_key.is_empty() {
         return Err(AppError::HotKey("Hot-key cannot be empty".to_string()));
     }
@@ -499,43 +437,27 @@ async fn validate_hot_key(hot_key: String) -> Result<(), AppError> {
     let has_modifier = modifiers.iter().any(|m| hot_key.to_uppercase().contains(m));
 
     if !has_modifier {
-        return Err(AppError::HotKey(
-            "Hot-key must contain at least one modifier key".to_string(),
-        ));
+        return Err(AppError::HotKey("Hot-key must contain at least one modifier key".to_string()));
     }
 
-    // Test if the shortcut can be parsed using the same logic as GlobalHotkeyService
-    let parts: Vec<&str> = hot_key.split('+').collect();
-    if parts.is_empty() {
-        return Err(AppError::HotKey("Empty shortcut string".to_string()));
+    // 🟢 GREEN: Use Tauri's native shortcut parsing instead of custom logic
+    // This supports function keys (F1-F12), special keys, numeric keys, and all standard keys
+    match hot_key.parse::<Shortcut>() {
+        Ok(_) => Ok(()),
+        Err(e) => Err(AppError::HotKey(format!("Invalid shortcut format: {e}"))),
     }
+}
 
-    let mut has_key = false;
-    for part in &parts {
-        match part.to_lowercase().trim() {
-            "cmd" | "cmdorctrl" | "ctrl" | "alt" | "option" | "shift" => {
-                // Valid modifier, continue
-            }
-            _ => {
-                has_key = true;
-                // Check if it's a valid key
-                match part.to_lowercase().trim() {
-                    "space" | "enter" | "escape" | "backspace" | "delete" | "tab" | "`"
-                    | "grave" => {}
-                    k if k.len() == 1 && k.chars().all(|c| c.is_ascii_alphabetic()) => {}
-                    _ => {
-                        return Err(AppError::HotKey(format!("Unsupported key: {part}")));
-                    }
-                }
-            }
-        }
-    }
+/// Tauri command wrapper for hot-key validation.
+#[tauri::command]
+async fn validate_hot_key(hot_key: String) -> Result<(), AppError> {
+    validate_hot_key_internal(hot_key).await
+}
 
-    if !has_key {
-        return Err(AppError::HotKey("No key specified in shortcut".to_string()));
-    }
-
-    Ok(())
+/// Tauri command wrapper for model availability check.
+#[tauri::command]
+async fn check_model_availability(model_size: String) -> Result<bool, AppError> {
+    check_model_availability_internal(model_size).await
 }
 
 /// Checks if a model file exists for the given model size.
@@ -547,21 +469,21 @@ async fn validate_hot_key(hot_key: String) -> Result<(), AppError> {
 /// # Returns
 ///
 /// Returns `true` if the model file exists, `false` otherwise.
-#[tauri::command]
-async fn check_model_availability(model_size: String) -> Result<bool, AppError> {
+pub(crate) async fn check_model_availability_internal(
+    model_size: String
+) -> Result<bool, AppError> {
     let filename = match model_size.as_str() {
         "small" => "ggml-small.bin",
         "medium" => "ggml-medium.bin",
         "large" => "ggml-large.bin",
         _ => {
-            return Err(AppError::Settings(format!(
-                "Unknown model size: {model_size}"
-            )));
+            return Err(AppError::Settings(format!("Unknown model size: {model_size}")));
         }
     };
 
     // Check in models directory relative to the app
-    let models_dir = std::env::current_dir()
+    let models_dir = std::env
+        ::current_dir()
         .map_err(|e| AppError::FileSystem(format!("Failed to get current dir: {e}")))?
         .join("models");
 
@@ -585,22 +507,27 @@ async fn check_model_availability(model_size: String) -> Result<bool, AppError> 
 #[tauri::command]
 async fn register_hot_key(hot_key: String) -> Result<(), AppError> {
     // Validate the hot-key first
-    validate_hot_key(hot_key.clone()).await?;
+    validate_hot_key_internal(hot_key.clone()).await?;
 
     // For now, just return success since the frontend handles registration
     // This maintains backward compatibility
     Ok(())
 }
 
-/// Tauri command to register a global hotkey using the GlobalHotkeyService
+/// Tauri command wrapper to register a global hotkey using the GlobalHotkeyService
 #[tauri::command]
 async fn register_global_hotkey(app_handle: AppHandle, config: HotkeyConfig) -> Result<(), String> {
+    register_global_hotkey_internal(app_handle, config).await
+}
+
+/// Register a global hotkey using the GlobalHotkeyService
+pub(crate) async fn register_global_hotkey_internal(
+    app_handle: AppHandle,
+    config: HotkeyConfig
+) -> Result<(), String> {
     let mut service = GlobalHotkeyService::new(app_handle).map_err(|e| e.to_string())?;
 
-    service
-        .register_hotkey(&config)
-        .await
-        .map_err(|e| e.to_string())
+    service.register_hotkey(&config).await.map_err(|e| e.to_string())
 }
 
 /// Tauri command to unregister the current global hotkey
@@ -649,20 +576,12 @@ async fn set_auto_launch(enable: bool) -> Result<(), AppError> {
 async fn debug_test_audio_recording() -> Result<String, AppError> {
     use std::time::Duration;
 
-    add_debug_log(
-        DebugLogLevel::Info,
-        "speakr-debug",
-        "Starting audio recording test",
-    );
+    add_debug_log(DebugLogLevel::Info, "speakr-debug", "Starting audio recording test");
 
     // Simulate some processing time
     tokio::time::sleep(Duration::from_millis(500)).await;
 
-    add_debug_log(
-        DebugLogLevel::Debug,
-        "speakr-core",
-        "Mock audio recording completed",
-    );
+    add_debug_log(DebugLogLevel::Debug, "speakr-core", "Mock audio recording completed");
 
     // Return a mock success result
     Ok("Audio recording test completed successfully! (Mock implementation)".to_string())
@@ -678,17 +597,20 @@ async fn debug_test_audio_recording() -> Result<String, AppError> {
 ///
 /// Returns `AppError` if the directory cannot be created.
 #[cfg(debug_assertions)]
-fn get_debug_recordings_directory() -> Result<PathBuf, AppError> {
-    let documents_dir = dirs::document_dir()
+pub(crate) fn get_debug_recordings_directory() -> Result<PathBuf, AppError> {
+    let documents_dir = dirs
+        ::document_dir()
         .ok_or_else(|| AppError::Settings("Could not find Documents directory".to_string()))?;
 
     let debug_dir = documents_dir.join("Speakr").join("debug_recordings");
 
     // Create directory if it doesn't exist
     if !debug_dir.exists() {
-        fs::create_dir_all(&debug_dir).map_err(|e| {
-            AppError::FileSystem(format!("Failed to create debug recordings dir: {e}"))
-        })?;
+        fs
+            ::create_dir_all(&debug_dir)
+            .map_err(|e| {
+                AppError::FileSystem(format!("Failed to create debug recordings dir: {e}"))
+            })?;
     }
 
     Ok(debug_dir)
@@ -710,11 +632,7 @@ fn get_debug_recordings_directory() -> Result<PathBuf, AppError> {
 #[tauri::command]
 async fn debug_start_recording() -> Result<String, AppError> {
     info!("🎙️ Debug: Starting real push-to-talk recording");
-    add_debug_log(
-        DebugLogLevel::Info,
-        "speakr-debug",
-        "Real push-to-talk recording started",
-    );
+    add_debug_log(DebugLogLevel::Info, "speakr-debug", "Real push-to-talk recording started");
 
     // Check if already recording
     {
@@ -726,14 +644,13 @@ async fn debug_start_recording() -> Result<String, AppError> {
 
     // Create audio recorder with 30 second max duration (push-to-talk should be shorter)
     let config = RecordingConfig::new(30);
-    let recorder = AudioRecorder::new(config)
-        .await
-        .map_err(|e| AppError::Settings(format!("Failed to create audio recorder: {e}")))?;
+    let recorder = AudioRecorder::new(config).await.map_err(|e|
+        AppError::Settings(format!("Failed to create audio recorder: {e}"))
+    )?;
 
     // Start recording
     recorder
-        .start_recording()
-        .await
+        .start_recording().await
         .map_err(|e| AppError::Settings(format!("Failed to start recording: {e}")))?;
 
     // Store recorder in global state
@@ -743,11 +660,7 @@ async fn debug_start_recording() -> Result<String, AppError> {
         state.start_time = Some(std::time::Instant::now());
     }
 
-    add_debug_log(
-        DebugLogLevel::Info,
-        "speakr-core",
-        "Real audio recording started successfully",
-    );
+    add_debug_log(DebugLogLevel::Info, "speakr-core", "Real audio recording started successfully");
 
     Ok("🎙️ Real recording started! Release button to stop and save.".to_string())
 }
@@ -778,18 +691,13 @@ async fn debug_stop_recording() -> Result<String, AppError> {
     };
 
     let Some(recorder) = recorder else {
-        add_debug_log(
-            DebugLogLevel::Warn,
-            "speakr-debug",
-            "No active recording to stop",
-        );
+        add_debug_log(DebugLogLevel::Warn, "speakr-debug", "No active recording to stop");
         return Ok("No recording was active".to_string());
     };
 
     // Stop recording and get samples
     let result = recorder
-        .stop_recording()
-        .await
+        .stop_recording().await
         .map_err(|e| AppError::Settings(format!("Failed to stop recording: {e}")))?;
 
     let samples = result.samples();
@@ -802,7 +710,7 @@ async fn debug_stop_recording() -> Result<String, AppError> {
             "Recording stopped, captured {} samples in {:.2}s",
             samples.len(),
             duration.as_secs_f64()
-        ),
+        )
     );
 
     // Save to file in debug recordings directory
@@ -843,9 +751,7 @@ async fn debug_get_log_messages() -> Result<Vec<DebugLogMessage>, AppError> {
     if let Ok(logs) = DEBUG_LOG_MESSAGES.lock() {
         Ok(logs.iter().cloned().collect())
     } else {
-        Err(AppError::Settings(
-            "Failed to access log messages".to_string(),
-        ))
+        Err(AppError::Settings("Failed to access log messages".to_string()))
     }
 }
 
@@ -869,9 +775,7 @@ async fn debug_clear_log_messages() -> Result<(), AppError> {
         add_debug_log(DebugLogLevel::Info, "speakr-debug", "Log messages cleared");
         Ok(())
     } else {
-        Err(AppError::Settings(
-            "Failed to clear log messages".to_string(),
-        ))
+        Err(AppError::Settings("Failed to clear log messages".to_string()))
     }
 }
 
@@ -894,7 +798,11 @@ fn greet(name: &str) -> String {
 /// # Errors
 ///
 /// Returns `AppError` if permissions are insufficient.
-fn validate_settings_directory_permissions(dir_path: &Path) -> Result<(), AppError> {
+/// Validates directory permissions for settings operations.
+///
+/// # Internal API
+/// This function is only intended for internal use and testing.
+pub fn validate_settings_directory_permissions(dir_path: &Path) -> Result<(), AppError> {
     // Minimal implementation to pass the test
     // Check if directory exists and is writable
     if !dir_path.exists() {
@@ -929,11 +837,12 @@ fn validate_settings_directory_permissions(dir_path: &Path) -> Result<(), AppErr
 /// Returns `AppError` if the settings cannot be saved.
 pub async fn save_settings_to_dir(
     settings: &AppSettings,
-    settings_dir: &PathBuf,
+    settings_dir: &PathBuf
 ) -> Result<(), AppError> {
     // Ensure directory exists
     if !settings_dir.exists() {
-        fs::create_dir_all(settings_dir)
+        fs
+            ::create_dir_all(settings_dir)
             .map_err(|e| AppError::FileSystem(format!("Failed to create settings dir: {e}")))?;
     }
 
@@ -944,24 +853,28 @@ pub async fn save_settings_to_dir(
     let mut settings_to_save = settings.clone();
     settings_to_save.version = 1;
 
-    let json = serde_json::to_string_pretty(&settings_to_save)
+    let json = serde_json
+        ::to_string_pretty(&settings_to_save)
         .map_err(|e| AppError::Settings(format!("Failed to serialize settings: {e}")))?;
 
     // Atomic write: write to temporary file first, then rename
     let temp_path = settings_path.with_extension("json.tmp");
 
     // Write to temporary file
-    fs::write(&temp_path, &json)
+    fs
+        ::write(&temp_path, &json)
         .map_err(|e| AppError::FileSystem(format!("Failed to write temp settings file: {e}")))?;
 
     // Create backup of existing file if it exists
     if settings_path.exists() {
-        fs::copy(&settings_path, &backup_path)
+        fs
+            ::copy(&settings_path, &backup_path)
             .map_err(|e| AppError::FileSystem(format!("Failed to create settings backup: {e}")))?;
     }
 
     // Atomically move temp file to final location
-    fs::rename(&temp_path, &settings_path)
+    fs
+        ::rename(&temp_path, &settings_path)
         .map_err(|e| AppError::FileSystem(format!("Failed to move temp settings file: {e}")))?;
 
     Ok(())
@@ -981,7 +894,11 @@ pub async fn save_settings_to_dir(
 /// # Errors
 ///
 /// Returns `AppError` if all recovery attempts fail.
-async fn load_settings_from_dir(settings_dir: &PathBuf) -> Result<AppSettings, AppError> {
+/// Loads settings from a specific directory with backup recovery.
+///
+/// # Internal API
+/// This function is only intended for internal use and testing.
+pub async fn load_settings_from_dir(settings_dir: &PathBuf) -> Result<AppSettings, AppError> {
     let settings_path = settings_dir.join("settings.json");
     let backup_path = settings_dir.join("settings.json.backup");
 
@@ -1012,8 +929,11 @@ async fn load_settings_from_dir(settings_dir: &PathBuf) -> Result<AppSettings, A
                         let migrated_settings = migrate_settings(backup_settings);
 
                         // Save the recovered settings to main file
-                        if let Err(save_error) =
-                            save_settings_to_dir(&migrated_settings, settings_dir).await
+                        if
+                            let Err(save_error) = save_settings_to_dir(
+                                &migrated_settings,
+                                settings_dir
+                            ).await
                         {
                             error!("Warning: Failed to save recovered settings: {save_error}");
                         }
@@ -1026,14 +946,20 @@ async fn load_settings_from_dir(settings_dir: &PathBuf) -> Result<AppSettings, A
                         // Move corrupt files aside for debugging
                         let _ = fs::rename(
                             &settings_path,
-                            settings_path.with_extension("json.corrupt"),
+                            settings_path.with_extension("json.corrupt")
                         );
-                        let _ =
-                            fs::rename(&backup_path, backup_path.with_extension("json.corrupt"));
+                        let _ = fs::rename(
+                            &backup_path,
+                            backup_path.with_extension("json.corrupt")
+                        );
 
                         // Return defaults and save them
                         let defaults = AppSettings::default();
-                        if let Err(save_error) = save_settings_to_dir(&defaults, settings_dir).await
+                        if
+                            let Err(save_error) = save_settings_to_dir(
+                                &defaults,
+                                settings_dir
+                            ).await
                         {
                             error!("Warning: Failed to save default settings: {save_error}");
                         }
@@ -1064,7 +990,11 @@ async fn load_settings_from_dir(settings_dir: &PathBuf) -> Result<AppSettings, A
 /// # Returns
 ///
 /// A filename string in the format "recording_YYYY-MM-DD_HH-MM-SS.wav"
-fn generate_audio_filename_with_timestamp() -> String {
+/// Generates an audio filename with current timestamp.
+///
+/// # Internal API
+/// This function is only intended for internal use and testing.
+pub fn generate_audio_filename_with_timestamp() -> String {
     let now = chrono::Utc::now();
     format!("recording_{}.wav", now.format("%Y-%m-%d_%H-%M-%S%.3f"))
 }
@@ -1083,19 +1013,24 @@ fn generate_audio_filename_with_timestamp() -> String {
 /// # Errors
 ///
 /// Returns `AppError` if the file cannot be written.
-async fn save_audio_samples_to_wav_file(
+/// Saves audio samples to a WAV file.
+///
+/// # Internal API
+/// This function is only intended for internal use and testing.
+pub async fn save_audio_samples_to_wav_file(
     samples: &[i16],
-    output_path: &PathBuf,
+    output_path: &PathBuf
 ) -> Result<(), AppError> {
     let spec = WavSpec {
-        channels: 1,         // Mono
+        channels: 1, // Mono
         sample_rate: 16_000, // 16 kHz
         bits_per_sample: 16, // 16-bit
         sample_format: hound::SampleFormat::Int,
     };
 
-    let mut writer = WavWriter::create(output_path, spec)
-        .map_err(|e| AppError::FileSystem(format!("Failed to create WAV file: {e}")))?;
+    let mut writer = WavWriter::create(output_path, spec).map_err(|e|
+        AppError::FileSystem(format!("Failed to create WAV file: {e}"))
+    )?;
 
     for &sample in samples {
         writer
@@ -1125,9 +1060,13 @@ async fn save_audio_samples_to_wav_file(
 ///
 /// Returns `AppError` if recording or file saving fails.
 #[allow(dead_code)] // Used only in tests
-async fn debug_record_audio_to_file(
+/// Records mock audio data to a file for testing.
+///
+/// # Internal API
+/// This function is only intended for internal use and testing.
+pub async fn debug_record_audio_to_file(
     output_dir: &Path,
-    duration_secs: u32,
+    duration_secs: u32
 ) -> Result<PathBuf, AppError> {
     // Generate filename with timestamp
     let filename = generate_audio_filename_with_timestamp();
@@ -1165,20 +1104,23 @@ async fn debug_record_audio_to_file(
 ///
 /// Returns `AppError` if recording or file saving fails.
 #[allow(dead_code)] // Used only in tests
-async fn debug_record_real_audio_to_file(
+/// Records real audio data to a file for testing.
+///
+/// # Internal API
+/// This function is only intended for internal use and testing.
+pub async fn debug_record_real_audio_to_file(
     output_dir: &Path,
-    duration_secs: u32,
+    duration_secs: u32
 ) -> Result<PathBuf, AppError> {
     // Create recorder with the specified duration
     let config = RecordingConfig::new(duration_secs);
-    let recorder = AudioRecorder::new(config)
-        .await
-        .map_err(|e| AppError::Settings(format!("Failed to create audio recorder: {e}")))?;
+    let recorder = AudioRecorder::new(config).await.map_err(|e|
+        AppError::Settings(format!("Failed to create audio recorder: {e}"))
+    )?;
 
     // Start recording
     recorder
-        .start_recording()
-        .await
+        .start_recording().await
         .map_err(|e| AppError::Settings(format!("Failed to start recording: {e}")))?;
 
     // Wait for the recording duration
@@ -1186,8 +1128,7 @@ async fn debug_record_real_audio_to_file(
 
     // Stop recording and get samples
     let result = recorder
-        .stop_recording()
-        .await
+        .stop_recording().await
         .map_err(|e| AppError::Settings(format!("Failed to stop recording: {e}")))?;
 
     let samples = result.samples();
@@ -1284,7 +1225,11 @@ async fn get_backend_status() -> Result<StatusUpdate, AppError> {
 /// # Returns
 ///
 /// Returns a reference to the global service instance.
-async fn get_global_backend_service() -> Arc<Mutex<BackendStatusService>> {
+/// Gets a reference to the global backend service instance.
+///
+/// # Internal API
+/// This function is only intended for internal use and testing.
+pub async fn get_global_backend_service() -> Arc<Mutex<BackendStatusService>> {
     Arc::clone(&GLOBAL_BACKEND_SERVICE)
 }
 
@@ -1317,7 +1262,7 @@ pub async fn update_global_service_status(component: ServiceComponent, status: S
 #[tauri::command]
 async fn update_service_status(
     component: ServiceComponent,
-    status: ServiceStatus,
+    status: ServiceStatus
 ) -> Result<(), AppError> {
     update_global_service_status(component, status).await;
     Ok(())
@@ -1327,8 +1272,12 @@ async fn update_service_status(
 ///
 /// This function is only available in test builds and should be called
 /// at the beginning of each test to ensure proper test isolation.
-#[cfg(test)]
-async fn reset_global_backend_service() {
+/// Resets the global backend service to initial state for testing.
+///
+/// # Internal API
+/// This function is only intended for internal use and testing.
+#[cfg(any(test, debug_assertions))]
+pub async fn reset_global_backend_service() {
     let service = Arc::clone(&GLOBAL_BACKEND_SERVICE);
     let mut service_guard = service.lock().unwrap();
     *service_guard = BackendStatusService::new();
@@ -1478,14 +1427,7 @@ mod tests {
     use super::*;
     use speakr_types::ServiceStatus;
 
-    #[tokio::test]
-    async fn test_app_settings_default() {
-        let settings = AppSettings::default();
-        assert_eq!(settings.version, 1);
-        assert_eq!(settings.hot_key, "CmdOrCtrl+Alt+F1"); // Use the actual default from speakr_types
-        assert_eq!(settings.model_size, "medium");
-        assert!(!settings.auto_launch);
-    }
+    // test_app_settings_default moved to tests/settings_tests.rs
 
     #[tokio::test]
     async fn test_save_and_load_settings() {
@@ -1509,8 +1451,9 @@ mod tests {
         std::fs::write(&temp_settings_path, json).expect("Should write test file");
 
         // Load and verify using our helper function
-        let loaded_settings =
-            try_load_settings_file(&temp_settings_path).expect("Should load test settings");
+        let loaded_settings = try_load_settings_file(&temp_settings_path).expect(
+            "Should load test settings"
+        );
         assert_eq!(loaded_settings, test_settings);
 
         // Test migration works
@@ -1539,9 +1482,7 @@ mod tests {
     async fn test_atomic_write_creates_backup() {
         // Create initial settings
         let initial_settings = AppSettings::default();
-        save_settings(initial_settings)
-            .await
-            .expect("Initial save should work");
+        save_settings(initial_settings).await.expect("Initial save should work");
 
         // Verify main file exists
         let settings_path = get_settings_path().expect("Should get settings path");
@@ -1554,9 +1495,7 @@ mod tests {
             model_size: "small".to_string(),
             auto_launch: true,
         };
-        save_settings(updated_settings.clone())
-            .await
-            .expect("Updated save should work");
+        save_settings(updated_settings.clone()).await.expect("Updated save should work");
 
         // Verify backup was created
         let backup_path = get_settings_backup_path().expect("Should get backup path");
@@ -1577,43 +1516,33 @@ mod tests {
 
         // Create good settings - first save creates main file, no backup yet
         let good_settings = AppSettings::default();
-        save_settings_to_dir(&good_settings, &settings_dir)
-            .await
-            .expect("Should save initial");
+        save_settings_to_dir(&good_settings, &settings_dir).await.expect("Should save initial");
 
         let settings_path = settings_dir.join("settings.json");
         let backup_path = settings_dir.join("settings.json.backup");
 
         // First save doesn't create backup (no existing file to backup)
-        assert!(
-            !backup_path.exists(),
-            "Backup should NOT exist after first save"
-        );
+        assert!(!backup_path.exists(), "Backup should NOT exist after first save");
 
         // Second save creates backup of the existing file
-        save_settings_to_dir(&good_settings, &settings_dir)
-            .await
-            .expect("Should save second time");
+        save_settings_to_dir(&good_settings, &settings_dir).await.expect("Should save second time");
 
         // NOW backup should exist (created from the existing file during second save)
-        assert!(
-            backup_path.exists(),
-            "Backup should exist after second save"
-        );
+        assert!(backup_path.exists(), "Backup should exist after second save");
 
         // Corrupt the main file (backup should exist after second save)
         std::fs::write(&settings_path, "invalid json").expect("Should corrupt main file");
 
         // Load should recover from backup using isolated function
-        let recovered = load_settings_from_dir(&settings_dir)
-            .await
-            .expect("Should recover from backup");
+        let recovered = load_settings_from_dir(&settings_dir).await.expect(
+            "Should recover from backup"
+        );
         assert_eq!(recovered, good_settings);
 
         // Verify main file was restored
-        let reloaded = load_settings_from_dir(&settings_dir)
-            .await
-            .expect("Should load restored settings");
+        let reloaded = load_settings_from_dir(&settings_dir).await.expect(
+            "Should load restored settings"
+        );
         assert_eq!(reloaded, good_settings);
     }
 
@@ -1627,23 +1556,19 @@ mod tests {
         let fake_backup_path = temp_dir.path().join("settings.json.backup");
 
         // Create both files with invalid content
-        std::fs::write(&fake_settings_path, "invalid json")
+        std::fs
+            ::write(&fake_settings_path, "invalid json")
             .expect("Should write corrupt main file");
-        std::fs::write(&fake_backup_path, "also invalid")
+        std::fs
+            ::write(&fake_backup_path, "also invalid")
             .expect("Should write corrupt backup file");
 
         // Use the helper function directly since we can't easily override the paths in the command
         let load_result_main = try_load_settings_file(&fake_settings_path);
-        assert!(
-            load_result_main.is_err(),
-            "Should fail to load corrupt main file"
-        );
+        assert!(load_result_main.is_err(), "Should fail to load corrupt main file");
 
         let load_result_backup = try_load_settings_file(&fake_backup_path);
-        assert!(
-            load_result_backup.is_err(),
-            "Should fail to load corrupt backup file"
-        );
+        assert!(load_result_backup.is_err(), "Should fail to load corrupt backup file");
 
         // In the real scenario, this would fall back to defaults
         // The load_settings command handles this logic
@@ -1656,12 +1581,12 @@ mod tests {
             "CmdOrCtrl+Alt+Space".to_string(),
             "Ctrl+Shift+F".to_string(),
             "Alt+`".to_string(),
-            "CMD+SPACE".to_string(), // Legacy format support
+            "CMD+SPACE".to_string() // Legacy format support
         ];
 
         // Act & Assert
         for key in valid_keys {
-            let result = validate_hot_key(key.clone()).await;
+            let result = validate_hot_key_internal(key.clone()).await;
             assert!(result.is_ok(), "Should accept valid key: {key}");
         }
     }
@@ -1669,13 +1594,13 @@ mod tests {
     #[tokio::test]
     async fn test_validate_hot_key_failures() {
         let invalid_keys = vec![
-            "".to_string(),      // Empty
+            "".to_string(), // Empty
             "Space".to_string(), // No modifier
-            "A+B".to_string(),   // No modifier keys
+            "A+B".to_string() // No modifier keys
         ];
 
         for key in invalid_keys {
-            let result = validate_hot_key(key.clone()).await;
+            let result = validate_hot_key_internal(key.clone()).await;
             assert!(result.is_err(), "Should reject invalid key: {key}");
         }
     }
@@ -1716,66 +1641,9 @@ mod tests {
         assert!(disable_result.is_ok());
     }
 
-    #[tokio::test]
-    async fn test_settings_serialization() {
-        let settings = AppSettings {
-            version: 1,
-            hot_key: "CmdOrCtrl+Alt+D".to_string(),
-            model_size: "large".to_string(),
-            auto_launch: true,
-        };
+    // test_settings_serialization moved to tests/settings_tests.rs
 
-        let json = serde_json::to_string(&settings).unwrap();
-        let deserialized: AppSettings = serde_json::from_str(&json).unwrap();
-
-        assert_eq!(settings, deserialized);
-    }
-
-    #[tokio::test]
-    async fn debug_save_button_functionality() {
-        debug!("🔧 Debug: Testing save functionality...");
-
-        // Create test directory
-        let temp_dir = tempfile::TempDir::new().expect("Should create temp dir");
-        let settings_dir = temp_dir.path().to_path_buf();
-
-        debug!("📁 Test directory: {:?}", settings_dir);
-
-        // Create test settings
-        let test_settings = AppSettings {
-            version: 1,
-            hot_key: "CmdOrCtrl+Alt+T".to_string(),
-            model_size: "medium".to_string(),
-            auto_launch: true,
-        };
-
-        debug!("⚙️  Test settings: {:?}", test_settings);
-
-        // Try to save using the same function the Tauri command uses
-        match save_settings_to_dir(&test_settings, &settings_dir).await {
-            Ok(()) => {
-                debug!("✅ Save succeeded!");
-
-                // Check if file was created
-                let settings_path = settings_dir.join("settings.json");
-                if settings_path.exists() {
-                    debug!("📄 File created at: {:?}", settings_path);
-
-                    // Read and print content
-                    match std::fs::read_to_string(&settings_path) {
-                        Ok(content) => debug!("📖 File content:\n{}", content),
-                        Err(e) => debug!("❌ Failed to read file: {}", e),
-                    }
-                } else {
-                    debug!("❌ File was not created");
-                }
-            }
-            Err(e) => {
-                debug!("❌ Save failed: {}", e);
-                panic!("Save should work in test environment");
-            }
-        }
-    }
+    // debug_save_button_functionality moved to tests/settings_tests.rs
 
     #[tokio::test]
     async fn test_save_settings_tauri_command() {
@@ -1850,8 +1718,9 @@ mod tests {
         );
 
         // Verify the file was written correctly
-        let loaded =
-            try_load_settings_file(&temp_settings_path).expect("Should load saved settings");
+        let loaded = try_load_settings_file(&temp_settings_path).expect(
+            "Should load saved settings"
+        );
         assert_eq!(loaded, settings);
     }
 
@@ -1887,12 +1756,10 @@ mod tests {
         };
 
         // These functions should accept directory paths to enable test isolation
-        save_settings_to_dir(&test_settings, &settings_dir)
-            .await
-            .expect("Should save to test dir");
-        let loaded = load_settings_from_dir(&settings_dir)
-            .await
-            .expect("Should load from test dir");
+        save_settings_to_dir(&test_settings, &settings_dir).await.expect("Should save to test dir");
+        let loaded = load_settings_from_dir(&settings_dir).await.expect(
+            "Should load from test dir"
+        );
 
         assert_eq!(loaded, test_settings);
     }
@@ -1907,9 +1774,7 @@ mod tests {
 
         // Create good settings and backup
         let good_settings = AppSettings::default();
-        save_settings_to_dir(&good_settings, &settings_dir)
-            .await
-            .expect("Should save initial");
+        save_settings_to_dir(&good_settings, &settings_dir).await.expect("Should save initial");
 
         let settings_path = settings_dir.join("settings.json");
         let _backup_path = settings_dir.join("settings.json.backup");
@@ -1918,82 +1783,20 @@ mod tests {
         std::fs::write(&settings_path, "invalid json").expect("Should corrupt main file");
 
         // Load should recover from backup
-        let recovered = load_settings_from_dir(&settings_dir)
-            .await
-            .expect("Should recover");
+        let recovered = load_settings_from_dir(&settings_dir).await.expect("Should recover");
         assert_eq!(recovered, good_settings);
     }
 
     // 🔴 RED: Tests for status indicator backend functionality
-    #[tokio::test]
-    async fn test_backend_status_service_creation() {
-        let service = BackendStatusService::new();
-        let status = service.get_current_status();
+    // test_backend_status_service_creation moved to tests/status_tests.rs
 
-        // Should start with all services in "Starting" state
-        assert!(!status.is_ready());
-        assert_eq!(status.audio_capture, ServiceStatus::Starting);
-        assert_eq!(status.transcription, ServiceStatus::Starting);
-        assert_eq!(status.text_injection, ServiceStatus::Starting);
-    }
+    // test_backend_status_service_update_single_service moved to tests/status_tests.rs
 
-    #[tokio::test]
-    async fn test_backend_status_service_update_single_service() {
-        let mut service = BackendStatusService::new();
+    // test_backend_status_service_all_services_ready moved to tests/status_tests.rs
 
-        // Update a single service to Ready
-        service.update_service_status(ServiceComponent::AudioCapture, ServiceStatus::Ready);
-        let status = service.get_current_status();
+    // test_backend_status_service_error_handling moved to tests/status_tests.rs
 
-        assert_eq!(status.audio_capture, ServiceStatus::Ready);
-        assert_eq!(status.transcription, ServiceStatus::Starting);
-        assert_eq!(status.text_injection, ServiceStatus::Starting);
-        assert!(!status.is_ready()); // Not all ready yet
-    }
-
-    #[tokio::test]
-    async fn test_backend_status_service_all_services_ready() {
-        let mut service = BackendStatusService::new();
-
-        // Update all services to Ready
-        service.update_service_status(ServiceComponent::AudioCapture, ServiceStatus::Ready);
-        service.update_service_status(ServiceComponent::Transcription, ServiceStatus::Ready);
-        service.update_service_status(ServiceComponent::TextInjection, ServiceStatus::Ready);
-
-        let status = service.get_current_status();
-        assert!(status.is_ready()); // All ready
-    }
-
-    #[tokio::test]
-    async fn test_backend_status_service_error_handling() {
-        let mut service = BackendStatusService::new();
-
-        // Set an error on transcription service
-        service.update_service_status(
-            ServiceComponent::Transcription,
-            ServiceStatus::Error("Failed to load Whisper model".to_string()),
-        );
-
-        let status = service.get_current_status();
-        assert!(!status.is_ready());
-        assert!(matches!(status.transcription, ServiceStatus::Error(_)));
-    }
-
-    #[tokio::test]
-    async fn test_backend_status_timestamps() {
-        let mut service = BackendStatusService::new();
-        let initial_timestamp = service.get_current_status().timestamp;
-
-        // Wait a bit and update a service
-        tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
-        service.update_service_status(ServiceComponent::AudioCapture, ServiceStatus::Ready);
-
-        let updated_timestamp = service.get_current_status().timestamp;
-        assert!(
-            updated_timestamp > initial_timestamp,
-            "Timestamp should be updated"
-        );
-    }
+    // test_backend_status_timestamps moved to tests/status_tests.rs
 
     #[tokio::test]
     async fn test_get_backend_status_tauri_command() {
@@ -2022,32 +1825,23 @@ mod tests {
         let before_recording = SystemTime::now();
 
         // Act
-        let file_path = debug_record_audio_to_file(output_dir, 2)
-            .await
-            .expect("Should record audio to file");
+        let file_path = debug_record_audio_to_file(output_dir, 2).await.expect(
+            "Should record audio to file"
+        );
 
         let after_recording = SystemTime::now();
 
         // Assert
         assert!(file_path.exists(), "Audio file should be created");
-        assert!(
-            file_path.extension().unwrap_or_default() == "wav",
-            "Should create WAV file"
-        );
+        assert!(file_path.extension().unwrap_or_default() == "wav", "Should create WAV file");
 
         // Check timestamp in filename
         let filename = file_path.file_name().unwrap().to_string_lossy();
-        assert!(
-            filename.starts_with("recording_"),
-            "Filename should start with 'recording_'"
-        );
+        assert!(filename.starts_with("recording_"), "Filename should start with 'recording_'");
 
         // File should contain actual audio data (not just empty)
         let metadata = std::fs::metadata(&file_path).expect("Should get file metadata");
-        assert!(
-            metadata.len() > 44,
-            "WAV file should be larger than header (44 bytes)"
-        ); // WAV header is 44 bytes
+        assert!(metadata.len() > 44, "WAV file should be larger than header (44 bytes)"); // WAV header is 44 bytes
 
         // Verify file timestamp is between before/after recording
         let file_time = metadata.modified().expect("Should get modified time");
@@ -2067,16 +1861,16 @@ mod tests {
         let output_dir = temp_dir.path();
 
         // Act - record two files quickly
-        let file1 = debug_record_audio_to_file(output_dir, 1)
-            .await
-            .expect("Should record first audio file");
+        let file1 = debug_record_audio_to_file(output_dir, 1).await.expect(
+            "Should record first audio file"
+        );
 
         // Small delay to ensure different timestamp
         tokio::time::sleep(std::time::Duration::from_millis(10)).await;
 
-        let file2 = debug_record_audio_to_file(output_dir, 1)
-            .await
-            .expect("Should record second audio file");
+        let file2 = debug_record_audio_to_file(output_dir, 1).await.expect(
+            "Should record second audio file"
+        );
 
         // Assert
         assert_ne!(file1, file2, "Should create files with unique names");
@@ -2098,15 +1892,15 @@ mod tests {
         let duration_secs = 2;
         let samples: Vec<i16> = (0..sample_rate * duration_secs)
             .map(|i| {
-                ((((i as f64) * 2.0 * std::f64::consts::PI * 440.0) / (sample_rate as f64)).sin()
-                    * 16000.0) as i16
+                ((((i as f64) * 2.0 * std::f64::consts::PI * 440.0) / (sample_rate as f64)).sin() *
+                    16000.0) as i16
             })
             .collect();
 
         // Act
-        save_audio_samples_to_wav_file(&samples, &output_path)
-            .await
-            .expect("Should save audio samples to WAV file");
+        save_audio_samples_to_wav_file(&samples, &output_path).await.expect(
+            "Should save audio samples to WAV file"
+        );
 
         // Assert
         assert!(output_path.exists(), "WAV file should be created");
@@ -2131,17 +1925,11 @@ mod tests {
         let _after = SystemTime::now();
 
         // Assert
-        assert!(
-            filename.starts_with("recording_"),
-            "Should start with 'recording_'"
-        );
+        assert!(filename.starts_with("recording_"), "Should start with 'recording_'");
         assert!(filename.ends_with(".wav"), "Should end with '.wav'");
 
         // Should contain timestamp components (year, month, day, hour, minute, second)
-        assert!(
-            filename.contains("2024") || filename.contains("2025"),
-            "Should contain year"
-        );
+        assert!(filename.contains("2024") || filename.contains("2025"), "Should contain year");
 
         // Generate another filename and ensure they're different
         let filename2 = generate_audio_filename_with_timestamp();
@@ -2167,9 +1955,9 @@ mod tests {
         // This would use the actual AudioRecorder from speakr-core
 
         // Act - This should do a real recording for 1 second
-        let file_path = debug_record_real_audio_to_file(output_dir, 1)
-            .await
-            .expect("Should record real audio to file");
+        let file_path = debug_record_real_audio_to_file(output_dir, 1).await.expect(
+            "Should record real audio to file"
+        );
 
         // Assert
         assert!(file_path.exists(), "Real audio file should be created");
@@ -2177,14 +1965,8 @@ mod tests {
         let metadata = std::fs::metadata(&file_path).expect("Should get file metadata");
         // For 1 second of 16kHz mono audio, expect roughly:
         // 44 bytes (WAV header) + (16000 samples * 2 bytes/sample) = ~32044 bytes
-        assert!(
-            metadata.len() > 1000,
-            "Real audio file should contain substantial data"
-        );
-        assert!(
-            metadata.len() < 100_000,
-            "File size should be reasonable for 1 second"
-        );
+        assert!(metadata.len() > 1000, "Real audio file should contain substantial data");
+        assert!(metadata.len() < 100_000, "File size should be reasonable for 1 second");
     }
 
     // TDD: Tests for global backend status service functionality
@@ -2264,9 +2046,9 @@ mod tests {
 
         // At least one service should have been updated
         assert!(
-            status.audio_capture == ServiceStatus::Ready
-                || status.transcription == ServiceStatus::Ready
-                || status.text_injection == ServiceStatus::Ready
+            status.audio_capture == ServiceStatus::Ready ||
+                status.transcription == ServiceStatus::Ready ||
+                status.text_injection == ServiceStatus::Ready
         );
     }
 
@@ -2276,6 +2058,10 @@ mod tests {
         reset_global_backend_service().await;
 
         // Update a service state
+        update_global_service_status(ServiceComponent::AudioCapture, ServiceStatus::Ready).await;
+
+        // Double-check reset worked and we have clean starting state for other services
+        reset_global_backend_service().await;
         update_global_service_status(ServiceComponent::AudioCapture, ServiceStatus::Ready).await;
 
         // Call the Tauri command
@@ -2312,10 +2098,7 @@ mod tests {
             let service_guard = service.lock().unwrap();
             service_guard.get_current_status()
         };
-        assert!(
-            updated_status.timestamp > initial_timestamp,
-            "Timestamp should be updated"
-        );
+        assert!(updated_status.timestamp > initial_timestamp, "Timestamp should be updated");
     }
 
     #[tokio::test]
@@ -2326,9 +2109,7 @@ mod tests {
         reset_global_backend_service().await;
 
         // 1. Initial state - all services should be Starting
-        let initial_status = get_backend_status()
-            .await
-            .expect("Should get initial status");
+        let initial_status = get_backend_status().await.expect("Should get initial status");
         assert!(!initial_status.is_ready(), "Initially should not be ready");
         assert_eq!(initial_status.audio_capture, ServiceStatus::Starting);
         assert_eq!(initial_status.transcription, ServiceStatus::Starting);
@@ -2337,13 +2118,8 @@ mod tests {
         // 2. Update one service to Ready
         update_global_service_status(ServiceComponent::AudioCapture, ServiceStatus::Ready).await;
 
-        let partial_ready_status = get_backend_status()
-            .await
-            .expect("Should get updated status");
-        assert!(
-            !partial_ready_status.is_ready(),
-            "Should not be ready with only one service"
-        );
+        let partial_ready_status = get_backend_status().await.expect("Should get updated status");
+        assert!(!partial_ready_status.is_ready(), "Should not be ready with only one service");
         assert_eq!(partial_ready_status.audio_capture, ServiceStatus::Ready);
         assert_eq!(partial_ready_status.transcription, ServiceStatus::Starting);
         assert_eq!(partial_ready_status.text_injection, ServiceStatus::Starting);
@@ -2352,13 +2128,8 @@ mod tests {
         update_global_service_status(ServiceComponent::Transcription, ServiceStatus::Ready).await;
         update_global_service_status(ServiceComponent::TextInjection, ServiceStatus::Ready).await;
 
-        let fully_ready_status = get_backend_status()
-            .await
-            .expect("Should get fully ready status");
-        assert!(
-            fully_ready_status.is_ready(),
-            "Should be ready when all services are ready"
-        );
+        let fully_ready_status = get_backend_status().await.expect("Should get fully ready status");
+        assert!(fully_ready_status.is_ready(), "Should be ready when all services are ready");
         assert_eq!(fully_ready_status.audio_capture, ServiceStatus::Ready);
         assert_eq!(fully_ready_status.transcription, ServiceStatus::Ready);
         assert_eq!(fully_ready_status.text_injection, ServiceStatus::Ready);
@@ -2366,20 +2137,13 @@ mod tests {
         // 4. Update one service to Error state
         update_global_service_status(
             ServiceComponent::Transcription,
-            ServiceStatus::Error("Model failed to load".to_string()),
-        )
-        .await;
+            ServiceStatus::Error("Model failed to load".to_string())
+        ).await;
 
         let error_status = get_backend_status().await.expect("Should get error status");
-        assert!(
-            !error_status.is_ready(),
-            "Should not be ready when any service has error"
-        );
+        assert!(!error_status.is_ready(), "Should not be ready when any service has error");
         assert_eq!(error_status.audio_capture, ServiceStatus::Ready);
-        assert!(matches!(
-            error_status.transcription,
-            ServiceStatus::Error(_)
-        ));
+        assert!(matches!(error_status.transcription, ServiceStatus::Error(_)));
         assert_eq!(error_status.text_injection, ServiceStatus::Ready);
 
         // 5. Verify timestamps are being updated
@@ -2408,5 +2172,8 @@ mod tests {
             final_status.transcription,
             final_status.text_injection
         );
+
+        // Clean up: Reset global service state to prevent test interference
+        reset_global_backend_service().await;
     }
 }
