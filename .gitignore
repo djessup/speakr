@@ -2,6 +2,7 @@
 dist/
 dist-test/
 target/
+book/
 
 # Development environment files
 .env
@@ -12,7 +13,6 @@ result-*
 flake.lock
 
 # Editor and IDE files
-.vscode/
 .idea/
 *.swp
 *.swo
