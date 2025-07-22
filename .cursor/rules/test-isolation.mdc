@@ -1,0 +1,155 @@
+---
+description: When writing tests involving filesystem/user data apply test isolation patterns
+globs: **/tests/*.rs,**/*test*.rs,**/src/**/mod.rs
+alwaysApply: false
+---
+
+# Test Isolation Rules
+
+## ❌ NEVER Use Real User Data in Tests
+
+```rust
+// ❌ BAD: Uses real user settings directory
+#[tokio::test]
+async fn test_settings() {
+    let result = save_settings(settings).await; // Touches ~/.config/speakr/
+    // This contaminates user data and causes test interference!
+}
+```
+
+```rust
+// ✅ GOOD: Uses isolated temporary directory
+#[tokio::test]
+async fn test_settings() {
+    use tempfile::TempDir;
+    let temp_dir = TempDir::new().expect("Should create temp dir");
+    let settings_dir = temp_dir.path().to_path_buf();
+
+    let result = save_settings_to_dir(&settings, &settings_dir).await;
+    // Completely isolated - no user data contamination
+}
+```
+
+## 🏗️ Use Dependency Injection for Testability
+
+**Pattern**: Create testable functions that accept paths/dependencies as parameters, then wrap them in Tauri commands.
+
+```rust
+// ✅ GOOD: Testable function with dependency injection
+async fn save_settings_to_dir(settings: &AppSettings, dir: &PathBuf) -> Result<(), TauriError> {
+    // Implementation that can be tested in isolation
+}
+
+// ✅ GOOD: Production Tauri command delegates to testable function
+#[tauri::command]
+async fn save_settings(settings: AppSettings) -> Result<(), TauriError> {
+    let settings_dir = get_settings_path()?.parent().unwrap().to_path_buf();
+    save_settings_to_dir(&settings, &settings_dir).await
+}
+```
+
+## 📁 Standard Rust Test Isolation Patterns
+
+### Use `tempfile::TempDir` for Filesystem Tests
+```rust
+use tempfile::TempDir;
+
+#[tokio::test]
+async fn test_file_operations() {
+    let temp_dir = TempDir::new().expect("Should create temp dir");
+    let test_path = temp_dir.path().join("test_file.json");
+
+    // All file operations happen in isolated directory
+    // Automatically cleaned up when temp_dir goes out of scope
+}
+```
+
+### Each Test Gets Its Own Sandbox
+```rust
+// ✅ GOOD: Each test is completely isolated
+#[tokio::test]
+async fn test_corruption_recovery() {
+    let temp_dir = TempDir::new().expect("Should create temp dir");
+    // This test can't interfere with any other test
+}
+
+#[tokio::test]
+async fn test_migration() {
+    let temp_dir = TempDir::new().expect("Should create temp dir");
+    // This test also can't interfere with any other test
+}
+```
+
+## 🔬 Test-Driven Development (TDD) Requirements
+
+**MANDATORY**: Follow Red-Green-Refactor cycle:
+
+1. **🔴 RED**: Write failing test first
+2. **🟢 GREEN**: Minimal implementation to pass
+3. **🔵 REFACTOR**: Improve code while keeping tests green
+
+See [TDD rules](tdd-rust.mdc) for more details.
+
+## 🚫 Common Test Contamination Anti-Patterns
+
+### DON'T Use Global State
+```rust
+// ❌ BAD: Global state causes test interference
+static mut GLOBAL_CONFIG: Option<Config> = None;
+
+#[test]
+fn test_a() {
+    unsafe { GLOBAL_CONFIG = Some(config_a); }
+    // This affects test_b!
+}
+```
+
+### DON'T Use Real Network/Database/Filesystem
+```rust
+// ❌ BAD: Uses real external resources
+#[test]
+fn test_api() {
+    let response = http::get("https://real-api.com/data").await;
+    // Flaky, slow, and depends on external service
+}
+
+// ✅ GOOD: Mock or use test doubles
+#[test]
+fn test_api() {
+    let mock_server = MockServer::start().await;
+    let response = http::get(&mock_server.url("/data")).await;
+    // Fast, reliable, isolated
+}
+```
+
+## 📋 Test Isolation Checklist
+
+Before writing any test, ensure:
+
+- [ ] Test uses `tempfile::TempDir` for any filesystem operations
+- [ ] Test doesn't access real user data directories
+- [ ] Test doesn't modify global state
+- [ ] Test can run in parallel with other tests safely
+- [ ] Test creates its own isolated environment
+- [ ] Test cleans up resources automatically
+- [ ] Production code uses dependency injection pattern for testability
+
+## 🎯 Speakr-Specific Patterns
+
+For settings persistence tests:
+```rust
+#[tokio::test]
+async fn test_settings_feature() {
+    use tempfile::TempDir;
+    let temp_dir = TempDir::new().expect("Should create temp dir");
+    let settings_dir = temp_dir.path().to_path_buf();
+
+    // Use *_to_dir functions for testing
+    save_settings_to_dir(&settings, &settings_dir).await.expect("Should save");
+    let loaded = load_settings_from_dir(&settings_dir).await.expect("Should load");
+
+    assert_eq!(loaded, settings);
+}
+```
+
+Remember: **Tests that touch real user data are bugs, not features!**

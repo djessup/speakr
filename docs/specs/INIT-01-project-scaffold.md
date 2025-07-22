@@ -6,7 +6,8 @@ Define the baseline repository layout, build tooling, and development workflows 
 
 1. **Workspace Layout (multi-crate)**
    - `speakr-core/` – pure Rust library (record → transcribe → inject).
-   - `speakr-tauri/` – Tauri desktop shell; contains `src-tauri/` and embeds Leptos frontend by default.
+   - `speakr-tauri/` – Tauri desktop shell; contains `src-tauri/` and embeds Leptos frontend by
+     default.
    - `speakr-ui/` – optional standalone Leptos UI crate (only if the UI is fully separated).
    - `models/` – user-downloaded GGUF Whisper models (git-ignored).
    - `docs/` – architecture, PRD, and spec docs (this folder).

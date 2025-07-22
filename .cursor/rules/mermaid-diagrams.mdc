@@ -1,0 +1,25 @@
+---
+description: Retreive this rule when creating diagrams or charts using Mermaid
+globs: *.md
+alwaysApply: false
+---
+<mermaid_diagrams type="rule" name="mermaid-diagrams">
+  <syntax>
+    - Use `<br>` instead of `\n` for line breaks
+    - Apply standard colour theme unless specified otherwise
+    - Do not use round brackets () within item labels
+    - Mermaid does not support unordered lists within item labels
+  </syntax>
+  <colour_theme>
+    classDef inputOutput fill:#FEE0D2,stroke:#E6550D,color:#E6550D
+    classDef llm fill:#E5F5E0,stroke:#31A354,color:#31A354
+    classDef components fill:#E6E6FA,stroke:#756BB1,color:#756BB1
+    classDef process fill:#EAF5EA,stroke:#C6E7C6,color:#77AD77
+    classDef stop fill:#E5E1F2,stroke:#C7C0DE,color:#8471BF
+    classDef data fill:#EFF3FF,stroke:#9ECAE1,color:#3182BD
+    classDef decision fill:#FFF5EB,stroke:#FD8D3C,color:#E6550D
+    classDef storage fill:#F2F0F7,stroke:#BCBDDC,color:#756BB1
+    classDef api fill:#FFF5F0,stroke:#FD9272,color:#A63603
+    classDef error fill:#FCBBA1,stroke:#FB6A4A,color:#CB181D
+  </colour_theme>
+</mermaid_diagrams>

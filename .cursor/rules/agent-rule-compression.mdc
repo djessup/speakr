@@ -1,0 +1,56 @@
+---
+# description: Practical rule-compression tactics to minimise tokens, keep fidelity
+globs: *.mdc
+alwaysApply: false
+---
+# Rule Compression Tactics
+
+## 0 Guiding Principle
+Treat every byte of context as billable real estate. Retain only tokens that raise the probability of a correct answer beyond a rate-distortion threshold.
+
+## 1 Pre-Compression Scan
+1. **Identify essential semantics**
+   - Named entities, numeric constraints, function signatures, error codes, user preferences.
+2. **Mark structural cues**
+   - Section headers, ordered steps, hierarchy markers.
+
+## 2 Surgical Pruning
+1. **Erase filler clauses** ("In order to", "The purpose of this is").
+2. **Collapse synonyms → single term** (choose the shortest canonical form).
+3. **Replace repeated long strings with aliases**
+   - e.g. `LongModuleNameWithSuffix` → `LMN`. Keep a one-line alias map at top.
+4. **Strip examples after the *first* illustrative instance** unless edge cases matter.
+5. **Convert prose lists → bullets**; drop conjunctions and punctuation where unambiguous.
+6. **Remove apologies, pleasantries, meta-commentary** (they add zero semantic value).
+
+## 3 Micro-Compression Tricks
+| Token Hog     | Swap-in         | Note                                               |
+| ------------- | --------------- | -------------------------------------------------- |
+| "will not"    | "won’t"         | Contractions save 1 token                          |
+| "for example" | "e.g."          | Latin abbreviations cost 1 token                   |
+| URLs          | `[#]` footnotes | Saves tokens when URLs are repeated                |
+| Long paths    | `$VAR/...`      | Document env var once                              |
+
+## 4 Context-Aware Summarise
+- **If** multiple paragraphs share the same subject-verb-object → merge into one sentence.
+- **Abstract numbers**: "~5 kB", "≈2 h" instead of exact if precision is irrelevant.
+- Split overall input into *queries*. Run selective retrieval per sub-query; concatenate only high-MI spans (Adaptive-QuerySelect heuristic).
+-
+## 5  Advanced one-shot compression
+1. **Run generic token-salience pruning**
+   - “Score and drop the least-important 40 % tokens; stop if summary meaning degrades.”
+2. **Apply sentence self-information filter**
+   - “Rank sentences by Δlog p; keep top-K that cover all headings.”
+3. **Convert long prose specs → YAML/JSON where possible.**
+4. **Minify code blocks and strip comments** (preserve signatures).
+5. **For repeating ≥30-token blocks**: keep first, replace others with `#HASH_ID`.
+6. **Round numeric literals** (≥4 decimal places → 2 sig-figs) if precision loss is acceptable.
+
+## 6 Post-Compression Verification
+1. Run a *round-trip paraphrase* check: ask yourself if the compressed version lets you fully reconstruct the essentials.
+2. If confidence < 0.9, restore the last token block removed.
+3. Ensure alias map and footnotes accompany the compressed text and are faithful to the original.
+
+## 7 When NOT to Compress
+- Formal quotes or contractual text.
+- Cryptographic hashes, code where whitespace is semantic, test vectors.

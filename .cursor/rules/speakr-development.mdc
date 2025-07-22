@@ -1,0 +1,73 @@
+---
+alwaysApply: true
+---
+
+<speakr_development_principles>
+
+<rust_standards>
+- **TDD Mandatory**: Write failing tests FIRST, then minimal implementation, then refactor
+- **No `unwrap()` in production**: Use proper error handling with `Result` and `?` operator
+- **Document public APIs**: Every public function needs rustdoc with examples
+- **Tauri commands NOT `pub`**: Use `async fn command_name()` not `pub async fn command_name()`
+
+Detailed Rust standards are available in:
+- [rust-async.mdc](mdc:rust-async.mdc)
+- [rust-cargo.mdc](mdc:rust-cargo.mdc)
+- [rust-clap.mdc](mdc:rust-clap.mdc)
+- [rust-documentation.mdc](mdc:rust-documentation.mdc)
+- [rust-error-handling.mdc](mdc:rust-error-handling.mdc)
+- [rust-observability.mdc](mdc:rust-observability.mdc)
+- [rust-ownership.mdc](mdc:rust-ownership.mdc)
+- [rust-performance.mdc](mdc:rust-performance.mdc)
+- [rust-safety.mdc](mdc:rust-safety.mdc)
+- [rust-style.mdc](mdc:rust-style.mdc)
+- [rust-testing.mdc](mdc:rust-testing.mdc)
+- [rust-type-system.mdc](mdc:rust-type-system.mdc)
+
+_Read and apply these rules in the appropriate situations._
+
+<rust_standards>
+
+<speakr_test_requirements>
+- **TDD Mandatory**: Write failing tests FIRST, then minimal implementation, then refactor
+- **Test Isolation**: Use `tempfile::TempDir` for filesystem tests - NEVER touch real user data
+- **Dependency Injection**: Write testable functions that accept dependencies as parameters
+- **Pattern**: Create `*_to_dir()` functions for testing, wrap in Tauri commands for production
+<speakr_test_requirements>
+
+<project_structure>
+- [`speakr-core/`](/speakr-core/) - core functionality (whisper, audio, text injection)
+- [`speakr-tauri/`](/speakr-tauri/) - Tauri backend (hotkeys, settings, events)
+- [`speakr-ui/`](/speakr-ui/) - Leptos frontend
+- [`speakr-types/`](/speakr-types/) - Shared types (events, config, etc.)
+</project_structure>
+
+<privacy_requirements>
+- **Local-only processing**: No data leaves the device
+- **Minimal permissions**: Only microphone + accessibility
+- **Settings location**: `$HOME/Library/Application Support/speakr/settings.json`
+</privacy_requirements>
+
+<development_workflow>
+
+Before any commit:
+```sh
+cargo fmt --all -- --check
+cargo clippy --all-targets --all-features -- -D warnings
+cargo test --workspace --all-features
+```
+</development_workflow>
+
+<related>
+
+- [tauri.mdc](tauri.mdc)
+</related>
+
+<important>
+- Use TDD for all code changes: 🔴 RED: Test fails - function doesn't exist, 🟢 GREEN: Minimal
+  implementation to pass test, 🔵 REFACTOR: Integrate into production code, all tests still pass
+- Write 🔴 RED: Test tests FIRST.
+- Implement 🟢 GREEN: production code to make tests pass.
+- Refactor 🔵 REFACTOR: to improve code quality.
+- Repeat until done.
+</important>

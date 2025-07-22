@@ -1,6 +1,7 @@
 # Development Guide
 
-This guide will help you set up the development environment for the Speakr Tauri + Leptos application.
+This guide will help you set up the development environment for the Speakr Tauri + Leptos
+application.
 
 ## Prerequisites
 
@@ -76,13 +77,13 @@ Once in the development environment, you have access to these commands:
 - `build` - Build production application
 - `build-ui` - Build frontend for production
 
-### Documentation
+### Docs (mdbook)
 
 - `docs-serve` - Start documentation server (mdbook)
 - `docs-build` - Build documentation
 - `docs-install-plugins` - Install mdbook plugins
 
-### Code Quality
+### Utilities
 
 - `format` - Format all code with rustfmt
 - `lint` - Run clippy linter
@@ -99,17 +100,15 @@ Once in the development environment, you have access to these commands:
 
 ```text
 speakr/
-├── src/                    # Leptos frontend source
-├── src-tauri/             # Tauri backend source
-├── docs/                  # Documentation (mdbook)
-├── public/                # Static assets
-├── dist/                  # Build output (generated)
-├── target/                # Rust build cache (generated)
-├── devenv.nix            # Development environment configuration
-├── devenv.yaml           # Project composition
-├── .envrc                # Direnv configuration
-├── .env.example          # Environment variables template
-└── .pre-commit-config.yaml # Pre-commit hooks
+├── speakr-ui/              # Leptos frontend source
+├── speakr-tauri/           # Tauri backend source
+├── speakr-core/            # Core functionality (whisper, audio capture, text injection)
+├── speakr-types/           # Shared types (events, config, etc.)
+├── devenv.nix              # Devenv definition
+├── devenv.yaml             # Devenv inputs
+├── .envrc                  # Direnv configuration
+├── .env.example            # Environment variables template
+└── .pre-commit-config.yaml # Pre-commit config
 ```
 
 ## Development Workflow

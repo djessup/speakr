@@ -116,4 +116,4 @@ repos:
     rev: v0.37.0
     hooks:
       - id: markdownlint-fix
-        args: ["--config", ".markdownlint.json"]
+        args: ["--fix"]

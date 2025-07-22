@@ -34,7 +34,7 @@ Thumbs.db
 
 # Cursor
 .cursor/*
-!.cursor/rules/
+!.cursor/rules*
 
 # Cargo/Rust
 Cargo.lock

@@ -1,0 +1,220 @@
+---
+description: ALWAYS follow Test-Driven Development (TDD) rules for Rust development
+globs: *.rs
+alwaysApply: false
+---
+
+# Test-Driven Development (TDD) for Rust
+
+## 🔄 Mandatory Red-Green-Refactor Cycle
+
+**Every feature MUST follow this exact sequence:**
+
+### 🔴 RED: Write Failing Test First
+```rust
+#[tokio::test]
+async fn test_validate_settings_directory_permissions() {
+    // RED: This test should fail initially since we haven't implemented the function
+    use tempfile::TempDir;
+
+    let temp_dir = TempDir::new().expect("Should create temp dir");
+    let settings_path = temp_dir.path().join("settings.json");
+
+    // Test that we can detect and handle permission issues
+    // This should fail initially because we don't have permission validation
+    let result = validate_settings_directory_permissions(&settings_path.parent().unwrap().to_path_buf());
+
+    // This should pass once we implement the function
+    assert!(result.is_ok(), "Should validate directory permissions");
+}
+```
+
+### 🟢 GREEN: Minimal Implementation
+```rust
+/// Validates that the settings directory has proper permissions for read/write operations.
+fn validate_settings_directory_permissions(dir_path: &PathBuf) -> Result<(), TauriError> {
+    // Minimal implementation to pass the test
+    // Check if directory exists and is writable
+    if !dir_path.exists() {
+        return Err(TauriError::FileSystem("Directory does not exist".to_string()));
+    }
+
+    // Try to create a test file to verify write permissions
+    let test_file = dir_path.join(".permission_test");
+    match std::fs::write(&test_file, "test") {
+        Ok(_) => {
+            // Clean up test file
+            let _ = std::fs::remove_file(&test_file);
+            Ok(())
+        }
+        Err(e) => Err(TauriError::FileSystem(format!("Directory not writable: {e}"))),
+    }
+}
+```
+
+### 🔵 REFACTOR: Integrate and Improve
+```rust
+/// Gets the settings file path in the app data directory.
+fn get_settings_path() -> Result<PathBuf, TauriError> {
+    let app_data = dirs::config_dir()
+        .ok_or_else(|| TauriError::Settings("Could not find config directory".to_string()))?;
+
+    let speakr_dir = app_data.join("speakr");
+    if !speakr_dir.exists() {
+        fs::create_dir_all(&speakr_dir)
+            .map_err(|e| TauriError::FileSystem(format!("Failed to create config dir: {e}")))?;
+    }
+
+    // Validate directory permissions after creation (REFACTOR: integrated!)
+    validate_settings_directory_permissions(&speakr_dir)?;
+
+    Ok(speakr_dir.join("settings.json"))
+}
+```
+
+## ⚠️ TDD Violations - Common Mistakes
+
+### ❌ Writing Implementation First
+```rust
+// ❌ BAD: Implementation without failing test
+fn new_feature() -> Result<String, Error> {
+    // This violates TDD - no failing test drove this design!
+    Ok("implementation".to_string())
+}
+
+#[test]
+fn test_new_feature() {
+    // Test written after implementation - not TDD!
+    assert!(new_feature().is_ok());
+}
+```
+
+### ❌ Over-Engineering in GREEN Phase
+```rust
+// ❌ BAD: Too complex for GREEN phase
+fn validate_permissions(dir: &PathBuf) -> Result<(), Error> {
+    // This is over-engineered for the first implementation!
+    // Complex logging, multiple validation strategies, etc.
+    // GREEN phase should be MINIMAL to pass the test!
+}
+```
+
+### ❌ Skipping REFACTOR Phase
+```rust
+// ❌ BAD: Test passes but code isn't integrated into production
+#[test]
+fn test_feature() { /* passes */ }
+
+fn feature() { /* minimal implementation */ }
+
+// Missing: Integration into actual production code paths
+// Missing: Code quality improvements
+// Missing: Performance optimizations
+```
+
+## ✅ TDD Best Practices for Rust
+
+### Use Descriptive Test Names
+```rust
+#[tokio::test]
+async fn test_settings_recovery_from_backup_when_main_file_corrupted() {
+    // Clear what this test validates
+}
+
+#[tokio::test]
+async fn test_migration_from_version_0_to_version_1_preserves_settings() {
+    // Behavior-driven test name
+}
+```
+
+### Write Tests That Document Requirements
+```rust
+#[tokio::test]
+async fn test_settings_save_completes_within_100ms_requirement() {
+    // FR-8 requirement: "Modifying settings updates file within 100 ms"
+    use std::time::Instant;
+
+    let start = Instant::now();
+    save_settings_to_dir(&settings, &test_dir).await.expect("Should save");
+    let duration = start.elapsed();
+
+    assert!(duration.as_millis() < 100, "FR-8 performance requirement");
+}
+```
+
+### Test Error Conditions First
+```rust
+#[tokio::test]
+async fn test_load_settings_handles_corrupted_file() {
+    // RED: Test error handling before implementing happy path
+    let temp_dir = TempDir::new().expect("Should create temp dir");
+    let settings_path = temp_dir.path().join("settings.json");
+
+    // Create corrupted file
+    std::fs::write(&settings_path, "invalid json").expect("Should write corrupt file");
+
+    // Should gracefully handle corruption
+    let result = load_settings_from_dir(&temp_dir.path().to_path_buf()).await;
+    assert!(result.is_ok(), "Should recover from corruption");
+}
+```
+
+## 🎯 Speakr-Specific TDD Patterns
+
+### Settings Persistence TDD
+```rust
+// 1. RED: Test the acceptance criteria first
+#[tokio::test]
+async fn test_fr8_settings_file_created_on_first_launch_with_defaults() {
+    // Direct test of FR-8 acceptance criteria
+}
+
+#[tokio::test]
+async fn test_fr8_modifying_settings_updates_file_within_100ms() {
+    // Direct test of FR-8 acceptance criteria
+}
+
+#[tokio::test]
+async fn test_fr8_corrupt_settings_file_triggers_automatic_recovery() {
+    // Direct test of FR-8 acceptance criteria
+}
+```
+
+### Tauri Command TDD
+```rust
+// 1. RED: Test the Tauri command interface
+#[tokio::test]
+async fn test_save_settings_tauri_command() {
+    // Test would fail because command doesn't exist
+    let result = save_settings(AppSettings::default()).await;
+    assert!(result.is_ok());
+}
+
+// 2. GREEN: Minimal Tauri command
+#[tauri::command]
+async fn save_settings(settings: AppSettings) -> Result<(), TauriError> {
+    // Minimal implementation
+    Ok(())
+}
+
+// 3. REFACTOR: Add real implementation using tested functions
+#[tauri::command]
+async fn save_settings(settings: AppSettings) -> Result<(), TauriError> {
+    let settings_dir = get_settings_path()?.parent().unwrap().to_path_buf();
+    save_settings_to_dir(&settings, &settings_dir).await
+}
+```
+
+## 🔬 TDD Verification
+
+Before considering any feature complete:
+
+- [ ] **RED**: Test failed initially (function/behavior didn't exist)
+- [ ] **GREEN**: Minimal implementation makes test pass
+- [ ] **REFACTOR**: Code integrated into production paths
+- [ ] All tests still pass after refactoring
+- [ ] No over-engineering - only implement what tests require
+- [ ] Error cases tested before happy paths
+- [ ] Performance requirements tested
+
+**Remember: If you didn't see the test fail first, you're not doing TDD!**

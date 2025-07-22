@@ -1,0 +1,10 @@
+extends: ../../.markdownlint.yml
+
+# Disable patterns common in .mdc rules
+line-length: false
+no-emphasis-as-heading: false
+first-line-heading:
+  front_matter_title: ^\s*description\s*[:]
+  level: 1
+no-inline-html:
+  allowed_elements: ["*", "rule"]

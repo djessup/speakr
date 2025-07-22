@@ -89,7 +89,8 @@ All crates live in a single **Cargo workspace** to guarantee compatible dependen
 | 5    | Same task              | Transcript returned → `enigo.text()` synthesises keystrokes      | ≤ 300 ms                        |
 | 6    | UI task                | Frontend receives status events via `emit()` and updates overlay | realtime                        |
 
-Failure cases (no mic, model missing, permission denied) surface via error events and native notifications.
+Failure cases (no mic, model missing, permission denied) surface via error events and native
+notifications.
 
 ---
 

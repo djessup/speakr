@@ -1,0 +1,15 @@
+---
+description: When using `git log`, `git show`, `git diff`, pipe the output thru `cat` to avoid the interactive pager.
+globs:
+alwaysApply: false
+---
+<rule name="git-avoid-interactive-pager">
+When using `git log`, `git show`, `git diff`, pipe the output thru `cat` to avoid the interactive pager.
+Remember to pipe `git` commands through cat to avoid the interactive pager. When using commands like git log, git show, or git diff, append `| cat` so you can see the output.
+
+<examples>
+- `git log | cat` instead of just `git log`
+- `git show | cat` instead of just `git show`
+- `git diff | cat` instead of just `git diff`
+</examples>
+</rule>

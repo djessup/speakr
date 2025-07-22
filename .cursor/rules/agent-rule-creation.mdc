@@ -1,0 +1,21 @@
+---
+description: How to write and name .mdc rule files
+globs: *.mdc
+alwaysApply: false
+---
+<rule_creation type="rule" name="agent-rule-creation">
+When creating new `.mdc` rules in `.cursor/rules/`:
+
+1. **File Naming Convention**:
+    - Follow the pattern: `<scope>-<rule-name>.mdc`.
+    - `<scope>` is a prefix like `python`, `agent`, `git`, etc.
+    - Use existing scopes as a convention. Create new ones logically if no existing scope fits.
+
+2. **Token Economy**:
+    - Write concise rules. Every token counts.
+    - Use examples if they clarify a complex rule more efficiently than text alone.
+    - Read the [rule-compression](agent-rule-compression.mdc) rule for tips on how to write concise rules.
+
+3. **File Location**:
+    - All new rules must be placed in the `.cursor/rules/` directory.
+</rule_creation>

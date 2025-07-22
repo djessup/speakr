@@ -1,0 +1,9 @@
+---
+description: When you need code examples, setup or configuration steps, or library/API documentation
+globs:
+alwaysApply: false
+mcpConfig: "Context7": { "command": "npx", "args": ["-y", "@upstash/context7-mcp" ] }
+---
+# Context7
+
+Use the `Context7` tool to get up-to-date library and API documentation, usage and code samples, setup instructions, etc.
