@@ -98,6 +98,81 @@ in
 
   # Development scripts
   scripts = {
+    # Help and information
+    help = {
+      description = "Display toolchain info and available commands";
+      exec =
+        let
+          # Function to determine group based on script name
+          getGroup =
+            name:
+            if lib.hasPrefix "dev" name then
+              "run"
+            else if lib.hasPrefix "build" name then
+              "build"
+            else if lib.hasPrefix "docs" name then
+              "docs"
+            else
+              "tools";
+
+          # Build script data with inferred groups (excluding help itself)
+          scriptLines = lib.mapAttrsToList (
+            name: value: if name != "help" then "${getGroup name}|${name}|${value.description}" else ""
+          ) config.scripts;
+
+          scriptData = builtins.concatStringsSep "\n" (builtins.filter (x: x != "") scriptLines);
+
+          # Define custom group order and process each group
+          processGroups = ''
+            # Define group order and icons
+            declare -a GROUP_ORDER=("run" "build" "docs" "tools")
+            declare -A GROUP_ICONS=(
+              ["run"]=" 🚀 Run  "
+              ["build"]="🔨 Build "
+              ["docs"]=" 📖 Docs "
+              ["tools"]="🧰 Utils "
+            )
+
+            # Process each group in custom order
+            for group in "''${GROUP_ORDER[@]}"; do
+              # Get commands for this group, sorted alphabetically by command name
+              group_commands=$(echo '${scriptData}' | grep "^$group|" | sort -t'|' -k2,2)
+
+              if [ -n "$group_commands" ]; then
+                if [ "$group" != "run" ]; then
+                  echo ""
+                fi
+
+                header="''${GROUP_ICONS[$group]:-$(echo $group | sed 's/./\U&/')}"
+                printf "\033[2m────\033[0m \033[1m%s\033[0m \033[2m──────────────────────────────────────────────────────\033[0m\n" "$header"
+
+                echo "$group_commands" | while IFS='|' read -r grp name desc; do
+                  printf "     \033[1;35m%-20s\033[0m - %s\n" "$name" "$desc"
+                done
+              fi
+            done
+          '';
+        in
+        ''
+          printf "\033[2m────\033[0m \033[1m📦 Toolchain\033[0m \033[2m───────────────────────────────────────────────────\033[0m\n"
+          echo "        🦀  Rust $(rustc --version)"
+          echo "        🌐  Trunk $(trunk --version)"
+          echo "        🔧  Tauri CLI $(cargo tauri --version 2>/dev/null || echo 'not installed')"
+          echo "        📖  mdbook $(mdbook --version)"
+          echo ""
+          echo ""
+
+          # Process groups in custom order
+          ${processGroups}
+
+          echo ""
+          printf "🦀 Welcome to the \033[1;36m${config.env.PROJECT_NAME}\033[0m 🗣️  dev-env!\n"
+          echo ""
+          printf "Run \033[1;36mdev\033[0m to start the application.\n"
+          echo ""
+        '';
+    };
+
     # Frontend development
     dev-ui = {
       description = "Start frontend only (Trunk serve)";
