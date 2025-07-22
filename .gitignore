@@ -39,3 +39,7 @@ Thumbs.db
 # Cargo/Rust
 Cargo.lock
 devenv.lock
+
+# Profiling/coverage
+*.profraw
+coverage/
