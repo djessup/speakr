@@ -175,6 +175,7 @@ in
     test = {
       description = "Run all tests";
       exec = "cargo test --all --workspace";
+
     };
     audit = {
       description = "Run cargo audit";
@@ -251,10 +252,10 @@ in
         # Define group order and icons
         declare -a GROUP_ORDER=("run" "build" "docs" "tools")
         declare -A GROUP_ICONS=(
-          ["run"]="🚀 Run"
-          ["build"]="🔨 Build"
-          ["docs"]="📖 Docs"
-          ["tools"]="🧰 Utils"
+          ["run"]=" 🚀 Run  "
+          ["build"]="🔨 Build "
+          ["docs"]=" 📖 Docs "
+          ["tools"]="🧰 Utils "
         )
 
         # Process each group in custom order
@@ -268,22 +269,22 @@ in
             fi
 
             header="''${GROUP_ICONS[$group]:-$(echo $group | sed 's/./\U&/')}"
-            printf "==== %s =======================================================\n" "$header"
+            printf "\033[2m────\033[0m \033[1m%s\033[0m \033[2m──────────────────────────────────────────────────────\033[0m\n" "$header"
 
             echo "$group_commands" | while IFS='|' read -r grp name desc; do
               # printf "     %-20s - %s\n" "$name" "$desc"
-              printf "     \033[1;36m%-20s\033[0m - %s\n" "$name" "$desc"
+              printf "     \033[1;35m%-20s\033[0m - %s\n" "$name" "$desc"
             done
           fi
         done
       '';
     in
     ''
-      echo "==== 📦 Toolchain ================================================="
-      echo "  🦀 Rust $(rustc --version)"
-      echo "  🌐 Trunk $(trunk --version)"
-      echo "  🔧 Tauri CLI $(cargo tauri --version 2>/dev/null || echo 'not installed')"
-      echo "  📖 mdbook $(mdbook --version)"
+      printf "\033[2m────\033[0m \033[1m📦 Toolchain\033[0m \033[2m───────────────────────────────────────────────────\033[0m\n"
+      echo "        🦀  Rust $(rustc --version)"
+      echo "        🌐  Trunk $(trunk --version)"
+      echo "        🔧  Tauri CLI $(cargo tauri --version 2>/dev/null || echo 'not installed')"
+      echo "        📖  mdbook $(mdbook --version)"
       echo ""
       echo ""
 
