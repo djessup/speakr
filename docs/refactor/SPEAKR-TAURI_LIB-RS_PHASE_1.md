@@ -49,22 +49,22 @@ pub async fn validate_hot_key_internal(hot_key: String) -> Result<(), AppError> 
 
 - [x] **Move settings-related tests** ✅ **11/13 tests migrated (85% success)**
   - [x] Extract `test_app_settings_default()` → `settings_tests.rs`
-  - [x] Extract `test_save_and_load_settings()` → `settings_tests.rs` ⭐ **MIGRATED**
-  - [x] Extract `test_settings_migration()` → `settings_tests.rs` ⭐ **MIGRATED**
+  - [x] Extract `test_save_and_load_settings()` → `settings_tests.rs
+  - [x] Extract `test_settings_migration()` → `settings_tests.rs
   - [~] Extract `test_atomic_write_creates_backup()` → ~~SKIPPED: Tests Tauri command~~
-  - [x] Extract `test_corruption_recovery_from_backup()` → `settings_tests.rs` ⭐ **MIGRATED**
-  - [x] Extract `test_corruption_recovery_fallback_to_defaults()` → `settings_tests.rs` ⭐ **MIGRATED**
+  - [x] Extract `test_corruption_recovery_from_backup()` → `settings_tests.rs
+  - [x] Extract `test_corruption_recovery_fallback_to_defaults()` → `settings_tests.rs
   - [x] Extract `test_settings_serialization()` → `settings_tests.rs`
   - [~] Extract `test_save_settings_tauri_command()` → ~~SKIPPED: Tests Tauri command~~
-  - [x] Extract `test_settings_performance()` → `settings_tests.rs` ⭐ **MIGRATED**
-  - [x] Extract `test_settings_directory_permissions()` → `settings_tests.rs` ⭐ **MIGRATED**
-  - [x] Extract `test_isolated_settings_save_and_load()` → `settings_tests.rs` ⭐ **MIGRATED**
-  - [x] Extract `test_isolated_corruption_recovery()` → `settings_tests.rs` ⭐ **MIGRATED**
+  - [x] Extract `test_settings_performance()` → `settings_tests.rs
+  - [x] Extract `test_settings_directory_permissions()` → `settings_tests.rs
+  - [x] Extract `test_isolated_settings_save_and_load()` → `settings_tests.rs
+  - [x] Extract `test_isolated_corruption_recovery()` → `settings_tests.rs
   - [x] Extract `debug_save_button_functionality()` → `settings_tests.rs`
 
 - [x] **Move hotkey-related tests** ✅ **2/3 tests migrated (67% success)**
-  - [x] Extract `test_validate_hot_key_success()` → `hotkey_tests.rs` ⭐ **MIGRATED**
-  - [x] Extract `test_validate_hot_key_failures()` → `hotkey_tests.rs` ⭐ **MIGRATED**
+  - [x] Extract `test_validate_hot_key_success()` → `hotkey_tests.rs
+  - [x] Extract `test_validate_hot_key_failures()` → `hotkey_tests.rs
   - [~] Extract `test_register_hot_key()` → ~~SKIPPED: Tests Tauri command~~
 
 - [x] **Move status-related tests** ✅ **9/12 tests migrated (75% success)**
@@ -74,20 +74,20 @@ pub async fn validate_hot_key_internal(hot_key: String) -> Result<(), AppError> 
   - [x] Extract `test_backend_status_service_error_handling()` → `status_tests.rs`
   - [x] Extract `test_backend_status_timestamps()` → `status_tests.rs`
   - [~] Extract `test_get_backend_status_tauri_command()` → ~~SKIPPED: Tests Tauri command~~
-  - [x] Extract `test_global_backend_service_initialization()` → `status_tests.rs` ⭐ **MIGRATED**
-  - [x] Extract `test_global_backend_service_state_updates()` → `status_tests.rs` ⭐ **MIGRATED**
-  - [x] Extract `test_global_backend_service_thread_safety()` → `status_tests.rs` ⭐ **MIGRATED**
+  - [x] Extract `test_global_backend_service_initialization()` → `status_tests.rs
+  - [x] Extract `test_global_backend_service_state_updates()` → `status_tests.rs
+  - [x] Extract `test_global_backend_service_thread_safety()` → `status_tests.rs
   - [~] Extract `test_get_backend_status_command_uses_real_service()`
     → ~~SKIPPED: Tests Tauri command~~
-  - [x] Extract `test_backend_service_emits_events_on_state_change()` → `status_tests.rs` ⭐ **MIGRATED**
+  - [x] Extract `test_backend_service_emits_events_on_state_change()` → `status_tests.rs
   - [~] Extract `test_complete_status_communication_flow()` → ~~SKIPPED: Uses get_backend_status Tauri command~~
 
 - [x] **Move audio-related tests** ✅ **5/5 tests migrated (100% success)**
-  - [x] Extract `test_debug_record_audio_to_file_saves_with_timestamp()` → `audio_tests.rs` ⭐ **MIGRATED**
-  - [x] Extract `test_debug_record_audio_to_file_creates_unique_filenames()` → `audio_tests.rs` ⭐ **MIGRATED**
-  - [x] Extract `test_save_audio_samples_to_wav_file()` → `audio_tests.rs` ⭐ **MIGRATED**
-  - [x] Extract `test_generate_audio_filename_with_timestamp()` → `audio_tests.rs` ⭐ **MIGRATED**
-  - [x] Extract `test_debug_real_audio_recording_integration()` → `audio_tests.rs` ⭐ **MIGRATED** (ignored, as expected)
+  - [x] Extract `test_debug_record_audio_to_file_saves_with_timestamp()` → `audio_tests.rs
+  - [x] Extract `test_debug_record_audio_to_file_creates_unique_filenames()` → `audio_tests.rs
+  - [x] Extract `test_save_audio_samples_to_wav_file()` → `audio_tests.rs
+  - [x] Extract `test_generate_audio_filename_with_timestamp()` → `audio_tests.rs
+  - [x] Extract `test_debug_real_audio_recording_integration()` → `audio_tests.rs (ignored, as expected)
 
 - [~] **Move command-related tests** ❌ **0/2 tests migrated (0% success)**
   - [~] Extract `test_check_model_availability()` → ~~SKIPPED: Tests Tauri command~~
@@ -132,7 +132,9 @@ All remaining tests are **Tauri commands** that cannot be moved because:
 
 1. `#[tauri::command]` functions cannot be `pub` (causes macro conflicts)
 2. External tests cannot directly invoke Tauri commands
-3. These tests require the full Tauri application context
+3. The may be possible to migrate by renaming the functions to `*_internal` and
+   making them `pub(crate)`, and moving the `#[tauri::command]` to a wrapper
+   function with the original function name.
 
 **Settings (2 tests):**
 
