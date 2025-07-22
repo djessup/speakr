@@ -11,7 +11,7 @@
 
 use leptos::prelude::*;
 use serde::{Deserialize, Serialize};
-use thiserror::Error;
+use speakr_types::{AppSettings, ModelSize};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 
@@ -42,79 +42,10 @@ async fn tauri_invoke_no_args<T: for<'de> Deserialize<'de>>(cmd: &str) -> Result
     serde_wasm_bindgen::from_value(result).map_err(|e| format!("Failed to deserialize result: {e}"))
 }
 
-/// Errors that can occur during settings operations.
-#[derive(Error, Debug, Clone, PartialEq)]
-pub enum SettingsError {
-    #[error("Failed to save settings: {0}")]
-    SaveError(String),
-    #[error("Failed to load settings: {0}")]
-    LoadError(String),
-    #[error("Invalid hot-key combination: {0}")]
-    InvalidHotKey(String),
-    #[error("Model file not found: {0}")]
-    ModelNotFound(String),
-    #[error("Hot-key conflicts with system shortcut: {0}")]
-    HotKeyConflict(String),
-    #[error("Tauri command error: {0}")]
-    TauriError(String),
-}
+/// Error type for settings operations
+pub type SettingsError = String;
 
-/// Available Whisper model sizes for transcription.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub enum ModelSize {
-    Small,
-    Medium,
-    Large,
-}
-
-impl ModelSize {
-    pub fn display_name(&self) -> &'static str {
-        match self {
-            ModelSize::Small => "Small (39MB, fast)",
-            ModelSize::Medium => "Medium (769MB, balanced)",
-            ModelSize::Large => "Large (1550MB, accurate)",
-        }
-    }
-
-    pub fn to_string_value(&self) -> &'static str {
-        match self {
-            ModelSize::Small => "small",
-            ModelSize::Medium => "medium",
-            ModelSize::Large => "large",
-        }
-    }
-
-    pub fn from_string(s: &str) -> Self {
-        match s {
-            "small" => ModelSize::Small,
-            "medium" => ModelSize::Medium,
-            "large" => ModelSize::Large,
-            _ => ModelSize::Medium, // Default fallback
-        }
-    }
-}
-
-/// Unified application settings - matches backend AppSettings exactly.
-/// This ensures consistency between frontend and backend representations.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct AppSettings {
-    /// Global hot-key combination in Tauri format (e.g., "CmdOrCtrl+Alt+Space")
-    pub hot_key: String,
-    /// Selected model size ("small", "medium", "large")
-    pub model_size: String,
-    /// Whether to auto-launch the app on system startup
-    pub auto_launch: bool,
-}
-
-impl Default for AppSettings {
-    fn default() -> Self {
-        Self {
-            hot_key: "CmdOrCtrl+Alt+Space".to_string(),
-            model_size: "medium".to_string(),
-            auto_launch: false,
-        }
-    }
-}
+// All types now centralized in speakr-types crate
 
 /// Settings manager that handles persistence and Tauri integration.
 pub struct SettingsManager;
@@ -124,70 +55,51 @@ impl SettingsManager {
     pub async fn load() -> Result<AppSettings, SettingsError> {
         tauri_invoke_no_args("load_settings")
             .await
-            .map_err(SettingsError::LoadError)
+            .map_err(|e| format!("Failed to load settings: {e}"))
     }
 
     /// Saves settings to the backend
     pub async fn save(settings: &AppSettings) -> Result<(), SettingsError> {
-        #[derive(Serialize)]
-        struct SaveArgs {
-            settings: AppSettings,
-        }
+        web_sys::console::log_1(&"🔧 SettingsManager::save called".into());
+        web_sys::console::log_1(
+            &format!("📤 Invoking Tauri command 'save_settings' with: {settings:?}").into(),
+        );
 
-        tauri_invoke::<(), _>(
-            "save_settings",
-            &(SaveArgs {
-                settings: settings.clone(),
-            }),
-        )
-        .await
-        .map_err(SettingsError::SaveError)
+        // Pass settings directly to match the Tauri command signature
+        match tauri_invoke::<(), _>("save_settings", settings).await {
+            Ok(result) => {
+                web_sys::console::log_1(
+                    &"✅ Tauri command 'save_settings' returned successfully".into(),
+                );
+                Ok(result)
+            }
+            Err(e) => {
+                web_sys::console::error_1(
+                    &format!("❌ Tauri command 'save_settings' failed: {e}").into(),
+                );
+                Err(format!("Failed to save settings: {e}"))
+            }
+        }
     }
 
     /// Validates a hot-key combination
     pub async fn validate_hot_key(hot_key: &str) -> Result<(), SettingsError> {
-        #[derive(Serialize)]
-        struct ValidateArgs {
-            hot_key: String,
-        }
-
-        tauri_invoke::<(), _>(
-            "validate_hot_key",
-            &(ValidateArgs {
-                hot_key: hot_key.to_string(),
-            }),
-        )
-        .await
-        .map_err(SettingsError::InvalidHotKey)
+        // Pass the hot_key string directly to match the Tauri command signature
+        tauri_invoke::<(), _>("validate_hot_key", &hot_key.to_string())
+            .await
+            .map_err(|e| format!("Invalid hot-key: {e}"))
     }
 
     /// Checks model availability
     pub async fn check_model_availability(model_size: &str) -> Result<bool, SettingsError> {
-        #[derive(Serialize)]
-        struct CheckArgs {
-            model_size: String,
-        }
-
-        tauri_invoke(
-            "check_model_availability",
-            &(CheckArgs {
-                model_size: model_size.to_string(),
-            }),
-        )
-        .await
-        .map_err(SettingsError::TauriError)
+        // Pass the model_size string directly to match the Tauri command signature
+        tauri_invoke("check_model_availability", &model_size.to_string()).await
     }
 
     /// Sets auto-launch preference
     pub async fn set_auto_launch(enable: bool) -> Result<(), SettingsError> {
-        #[derive(Serialize)]
-        struct AutoLaunchArgs {
-            enable: bool,
-        }
-
-        tauri_invoke::<(), _>("set_auto_launch", &(AutoLaunchArgs { enable }))
-            .await
-            .map_err(SettingsError::TauriError)
+        // Pass the boolean directly to match the Tauri command signature
+        tauri_invoke::<(), _>("set_auto_launch", &enable).await
     }
 }
 
@@ -222,29 +134,23 @@ impl GlobalShortcutManager {
                 let promise: js_sys::Promise = promise.into();
                 let result = wasm_bindgen_futures::JsFuture::from(promise)
                     .await
-                    .map_err(|e| {
-                        SettingsError::HotKeyConflict(format!("Failed to register shortcut: {e:?}"))
-                    })?;
+                    .map_err(|e| format!("Hot-key conflict: Failed to register shortcut: {e:?}"))?;
 
                 // Check if registration was successful
-                let success =
-                    js_sys::Reflect::get(&result, &JsValue::from("success")).map_err(|_| {
-                        SettingsError::TauriError("Invalid response format".to_string())
-                    })?;
+                let success = js_sys::Reflect::get(&result, &JsValue::from("success"))
+                    .map_err(|_| "Command error: Invalid response format")?;
 
                 if success.as_bool() == Some(true) {
                     Ok(())
                 } else {
                     let error = js_sys::Reflect::get(&result, &JsValue::from("error"))
                         .unwrap_or_else(|_| JsValue::from("Unknown error"));
-                    Err(SettingsError::HotKeyConflict(format!(
-                        "Registration failed: {error:?}"
-                    )))
+                    Err(format!("Hot-key conflict: Registration failed: {error:?}"))
                 }
             }
-            Err(e) => Err(SettingsError::TauriError(format!(
-                "Failed to execute registration: {e:?}"
-            ))),
+            Err(e) => Err(format!(
+                "Command error: Failed to execute registration: {e:?}"
+            )),
         }
     }
 
@@ -269,18 +175,17 @@ impl GlobalShortcutManager {
                 let promise: js_sys::Promise = promise.into();
                 let _result = wasm_bindgen_futures::JsFuture::from(promise)
                     .await
-                    .map_err(|e| {
-                        SettingsError::TauriError(format!("Failed to unregister shortcut: {e:?}"))
-                    })?;
+                    .map_err(|e| format!("Command error: Failed to unregister shortcut: {e:?}"))?;
                 Ok(())
             }
-            Err(e) => Err(SettingsError::TauriError(format!(
-                "Failed to execute unregistration: {e:?}"
-            ))),
+            Err(e) => Err(format!(
+                "Command error: Failed to execute unregistration: {e:?}"
+            )),
         }
     }
 
     /// Unregisters all global shortcuts
+    #[allow(dead_code)]
     pub async fn unregister_all() -> Result<(), SettingsError> {
         let result = js_sys::eval(
             r#"
@@ -302,15 +207,13 @@ impl GlobalShortcutManager {
                 let _result = wasm_bindgen_futures::JsFuture::from(promise)
                     .await
                     .map_err(|e| {
-                        SettingsError::TauriError(format!(
-                            "Failed to unregister all shortcuts: {e:?}"
-                        ))
+                        format!("Command error: Failed to unregister all shortcuts: {e:?}")
                     })?;
                 Ok(())
             }
-            Err(e) => Err(SettingsError::TauriError(format!(
-                "Failed to execute unregister all: {e:?}"
-            ))),
+            Err(e) => Err(format!(
+                "Command error: Failed to execute unregister all: {e:?}"
+            )),
         }
     }
 }
@@ -380,8 +283,15 @@ pub fn SettingsPanel() -> impl IntoView {
     // Save settings function
     let save_settings = move || {
         spawn_local(async move {
-            match SettingsManager::save(&settings.get()).await {
+            // Add debug logging
+            web_sys::console::log_1(&"🔧 Save button clicked - attempting to save settings".into());
+
+            let current_settings = settings.get();
+            web_sys::console::log_1(&format!("📄 Settings to save: {current_settings:?}").into());
+
+            match SettingsManager::save(&current_settings).await {
                 Ok(_) => {
+                    web_sys::console::log_1(&"✅ Backend save succeeded!".into());
                     set_success_message.set(Some("Settings saved successfully!".to_string()));
                     set_error_message.set(None);
 
@@ -392,7 +302,11 @@ pub fn SettingsPanel() -> impl IntoView {
                     });
                 }
                 Err(e) => {
-                    set_error_message.set(Some(format!("Failed to save settings: {e}")));
+                    let error_msg = format!("Failed to save settings: {e}");
+                    web_sys::console::error_1(
+                        &format!("❌ Backend save failed: {error_msg}").into(),
+                    );
+                    set_error_message.set(Some(error_msg));
                     set_success_message.set(None);
                 }
             }
@@ -475,6 +389,7 @@ pub fn SettingsPanel() -> impl IntoView {
         <div class="settings-panel">
             <div class="settings-header">
                 <h2>"Settings"</h2>
+                <p class="setting-description">"Configure Speakr for your perfect dictation experience"</p>
                 {move || loading.get().then(|| view! {
                     <div class="loading-indicator">
                         <div class="spinner"></div>
@@ -487,14 +402,14 @@ pub fn SettingsPanel() -> impl IntoView {
                 if let Some(error) = error_message.get() {
                     view! {
                         <div class="error-message">
-                            <span class="error-icon">"⚠️"</span>
+                            <span>"⚠️"</span>
                             <span>{error}</span>
                         </div>
                     }.into_any()
                 } else if let Some(success) = success_message.get() {
                     view! {
                         <div class="success-message">
-                            <span class="success-icon">"✅"</span>
+                            <span>"✅"</span>
                             <span>{success}</span>
                         </div>
                     }.into_any()
@@ -506,9 +421,9 @@ pub fn SettingsPanel() -> impl IntoView {
             <div class="settings-content">
                 // Hot-key Configuration Section
                 <div class="setting-group">
-                    <h3>"Global Hot-key"</h3>
+                    <h3>"⌨️ Global Hot-key"</h3>
                     <p class="setting-description">
-                        "Keyboard shortcut to activate Speakr from anywhere on your system"
+                        "Keyboard shortcut to activate Speakr from anywhere on your system. Press this combination to start dictating."
                     </p>
 
                     <div class="hotkey-section">
@@ -532,13 +447,13 @@ pub fn SettingsPanel() -> impl IntoView {
                                                 on:click=move |_| save_hotkey()
                                                 disabled={move || temp_hotkey.get().is_empty()}
                                             >
-                                                "Save"
+                                                "💾 Save"
                                             </button>
                                             <button
                                                 class="btn-secondary"
                                                 on:click=move |_| cancel_editing_hotkey()
                                             >
-                                                "Cancel"
+                                                "❌ Cancel"
                                             </button>
                                         </div>
                                     </div>
@@ -553,7 +468,7 @@ pub fn SettingsPanel() -> impl IntoView {
                                             class="btn-secondary"
                                             on:click=move |_| start_editing_hotkey()
                                         >
-                                            "Edit"
+                                            "✏️ Edit"
                                         </button>
                                     </div>
                                 }.into_any()
@@ -564,9 +479,9 @@ pub fn SettingsPanel() -> impl IntoView {
 
                 // Model Selection Section
                 <div class="setting-group">
-                    <h3>"Transcription Model"</h3>
+                    <h3>"🧠 Transcription Model"</h3>
                     <p class="setting-description">
-                        "Choose the Whisper model size based on your accuracy and speed preferences"
+                        "Choose the Whisper model size based on your accuracy and speed preferences. Larger models are more accurate but require more resources."
                     </p>
 
                     <div class="model-options">
@@ -579,6 +494,12 @@ pub fn SettingsPanel() -> impl IntoView {
                                 let model_key = model.to_string_value();
                                 let is_selected = current_model == model_key;
                                 let is_available = availability.get(model_key).unwrap_or(&false);
+
+                                let (icon, description) = match model {
+                                    ModelSize::Small => ("⚡", "Fast processing, good for quick notes"),
+                                    ModelSize::Medium => ("⚖️", "Balanced accuracy and speed"),
+                                    ModelSize::Large => ("🎯", "Highest accuracy, best for professional use"),
+                                };
 
                                 view! {
                                     <div class={format!("model-option {} {}",
@@ -598,7 +519,13 @@ pub fn SettingsPanel() -> impl IntoView {
                                             }
                                         />
                                         <label for={format!("model_{model_key}")} class="model-label">
-                                            <div class="model-name">{model.display_name()}</div>
+                                            <div class="model-info">
+                                                <div class="model-header">
+                                                    <span class="model-icon">{icon}</span>
+                                                    <div class="model-name">{model.display_name()}</div>
+                                                </div>
+                                                <div class="model-description">{description}</div>
+                                            </div>
                                             <div class="model-status">
                                                 {if *is_available {
                                                     "✅ Available"
@@ -616,9 +543,9 @@ pub fn SettingsPanel() -> impl IntoView {
 
                 // Auto-launch Section
                 <div class="setting-group">
-                    <h3>"Auto-launch"</h3>
+                    <h3>"🚀 Auto-launch"</h3>
                     <p class="setting-description">
-                        "Automatically start Speakr when you log in to your computer"
+                        "Automatically start Speakr when you log in to your computer, so it's always ready when you need it."
                     </p>
 
                     <label class="checkbox-label">
@@ -640,9 +567,39 @@ pub fn SettingsPanel() -> impl IntoView {
                                 });
                             }
                         />
-                        <span class="checkmark"></span>
-                        <span>"Start Speakr on login"</span>
+                        <div class="checkbox-content">
+                            <span class="checkbox-label-text">"Start Speakr on login"</span>
+                            <span class="checkbox-help">"Recommended for seamless workflow integration"</span>
+                        </div>
                     </label>
+                </div>
+
+                // Quick Tips Section
+                <div class="setting-group">
+                    <h3>"💡 Quick Tips"</h3>
+                    <div class="tips-list">
+                        <div class="tip-item">
+                            <span class="tip-icon">"🎙️"</span>
+                            <div class="tip-content">
+                                <div class="tip-title">"Clear Audio"</div>
+                                <div class="tip-description">"Speak clearly and reduce background noise for better accuracy"</div>
+                            </div>
+                        </div>
+                        <div class="tip-item">
+                            <span class="tip-icon">"⏸️"</span>
+                            <div class="tip-content">
+                                <div class="tip-title">"Natural Pauses"</div>
+                                <div class="tip-description">"Pause briefly between sentences for better punctuation"</div>
+                            </div>
+                        </div>
+                        <div class="tip-item">
+                            <span class="tip-icon">"🔒"</span>
+                            <div class="tip-content">
+                                <div class="tip-title">"Privacy First"</div>
+                                <div class="tip-description">"All processing happens locally - your voice never leaves your device"</div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

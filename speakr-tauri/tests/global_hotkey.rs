@@ -1,5 +1,5 @@
-// Import from the main library
-use speakr_lib::HotkeyConfig;
+// Import from the types crate directly
+use speakr_types::HotkeyConfig;
 
 #[cfg(test)]
 mod tests {
@@ -15,7 +15,7 @@ mod tests {
         let config = HotkeyConfig::default();
 
         // Assert
-        assert_eq!(config.shortcut, "CmdOrCtrl+Alt+Space");
+        assert_eq!(config.shortcut, "CmdOrCtrl+Alt+F1");
         assert!(config.enabled);
     }
 

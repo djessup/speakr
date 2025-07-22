@@ -1,0 +1,15 @@
+[package]
+name = "speakr-types"
+version = "0.1.0"
+edition = "2021"
+description = "Shared data types for the Speakr application"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+thiserror = "1.0"
+
+[dev-dependencies]
+serde_json = "1.0"
+
+[features]
+default = []
