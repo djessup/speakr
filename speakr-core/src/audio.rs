@@ -353,6 +353,7 @@ impl AudioSystem for CpalAudioSystem {
 
         // Keep the stream alive by leaking it - this is necessary because cpal streams
         // are not Send/Sync and we can't store them in our thread-safe wrapper.
+        // TODO: allow stream to be stopped
         // In a production system, you'd want a more sophisticated approach to stream lifecycle.
         std::mem::forget(stream);
 
