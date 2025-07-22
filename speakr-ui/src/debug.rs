@@ -68,6 +68,17 @@ impl LogLevel {
             LogLevel::Error => "log-error",
         }
     }
+
+    /// Returns the numeric priority of the log level (higher number = higher priority)
+    pub fn priority(&self) -> u8 {
+        match self {
+            LogLevel::Trace => 0,
+            LogLevel::Debug => 1,
+            LogLevel::Info => 2,
+            LogLevel::Warn => 3,
+            LogLevel::Error => 4,
+        }
+    }
 }
 
 /// A log message entry
@@ -81,6 +92,7 @@ pub struct LogMessage {
 
 impl LogMessage {
     /// Creates a new log message
+    #[allow(dead_code)] // Used for mock messages in debug builds
     pub fn new(level: LogLevel, target: &str, message: &str) -> Self {
         Self {
             timestamp: js_sys::Date::new_0()
@@ -120,6 +132,54 @@ async fn tauri_invoke_no_args<T: for<'de> Deserialize<'de>>(cmd: &str) -> Result
     let result = invoke(cmd, JsValue::NULL).await;
 
     serde_wasm_bindgen::from_value(result).map_err(|e| format!("Failed to deserialize result: {e}"))
+}
+
+/// Filters log messages and returns them in reverse chronological order (newest first)
+///
+/// # Arguments
+/// * `messages` - The log messages to filter
+/// * `level_filter` - Optional log level to filter by (None shows all)
+///
+/// # Returns
+/// Filtered messages in reverse chronological order
+fn filter_and_reverse_messages(
+    messages: &[LogMessage],
+    level_filter: Option<LogLevel>,
+) -> Vec<LogMessage> {
+    let mut filtered: Vec<LogMessage> = if let Some(level) = level_filter {
+        messages
+            .iter()
+            .filter(|msg| msg.level == level)
+            .cloned()
+            .collect()
+    } else {
+        messages.to_vec()
+    };
+
+    // Sort by timestamp in reverse order (newest first)
+    filtered.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+    filtered
+}
+
+/// Filters log messages by level hierarchy (includes selected level and all higher priority levels)
+///
+/// # Arguments
+/// * `messages` - The log messages to filter
+/// * `min_level` - The minimum log level to show (includes this level and higher)
+///
+/// # Returns
+/// Filtered messages that match the level hierarchy
+fn filter_messages_by_level_hierarchy(
+    messages: &[LogMessage],
+    min_level: LogLevel,
+) -> Vec<LogMessage> {
+    let min_priority = min_level.priority();
+
+    messages
+        .iter()
+        .filter(|msg| msg.level.priority() >= min_priority)
+        .cloned()
+        .collect()
 }
 
 /// Debug manager that handles development-only functionality
@@ -169,8 +229,11 @@ pub fn LoggingConsole() -> impl IntoView {
     let (selected_level, set_selected_level) = signal::<Option<LogLevel>>(None);
     let (auto_scroll, set_auto_scroll) = signal(true);
 
-    // Initial load of log messages
-    Effect::new(move || {
+    // Auto-refresh state
+    let (auto_refresh_enabled, set_auto_refresh_enabled) = signal(true);
+
+    // Function to refresh log messages - create a reusable function
+    let do_refresh = move || {
         spawn_local(async move {
             match DebugManager::get_log_messages().await {
                 Ok(messages) => {
@@ -180,26 +243,78 @@ pub fn LoggingConsole() -> impl IntoView {
                     // Silently fail - we don't want to spam errors in a debug console
                     // Add some mock messages for testing
                     let mock_messages = vec![
-                        LogMessage::new(LogLevel::Info, "speakr-debug", "Debug panel initialized"),
-                        LogMessage::new(LogLevel::Debug, "speakr-core", "Audio system ready"),
-                        LogMessage::new(LogLevel::Warn, "speakr-tauri", "Mock warning message"),
+                        LogMessage {
+                            timestamp: "2024-01-01T12:00:00Z".to_string(),
+                            level: LogLevel::Info,
+                            target: "speakr-debug".to_string(),
+                            message: "Debug panel initialized".to_string(),
+                        },
+                        LogMessage {
+                            timestamp: "2024-01-01T12:01:00Z".to_string(),
+                            level: LogLevel::Debug,
+                            target: "speakr-core".to_string(),
+                            message: "Audio system ready".to_string(),
+                        },
+                        LogMessage {
+                            timestamp: "2024-01-01T12:02:00Z".to_string(),
+                            level: LogLevel::Warn,
+                            target: "speakr-tauri".to_string(),
+                            message: "Mock warning message".to_string(),
+                        },
                     ];
                     set_log_messages.set(mock_messages);
                 }
             }
         });
+    };
+
+    // Initial load of log messages
+    Effect::new({
+        move || {
+            do_refresh();
+        }
     });
 
-    // Filter messages based on selected level
+    // Auto-refresh effect - runs every 2 seconds when enabled
+    Effect::new({
+        move || {
+            if auto_refresh_enabled.get() {
+                spawn_local(async move {
+                    loop {
+                        // Use a simple sleep using Promise and setTimeout
+                        let promise = js_sys::Promise::new(
+                            &mut (|resolve, _| {
+                                let window = web_sys::window().unwrap();
+                                let _ = window
+                                    .set_timeout_with_callback_and_timeout_and_arguments_0(
+                                        &resolve, 2000,
+                                    );
+                            }),
+                        );
+                        let _ = wasm_bindgen_futures::JsFuture::from(promise).await;
+
+                        if !auto_refresh_enabled.get() {
+                            break;
+                        }
+                        do_refresh();
+                    }
+                });
+            }
+        }
+    });
+
+    // Filter messages based on selected level with hierarchy and reverse chronological order
     let filtered_messages = move || {
         let messages = log_messages.get();
         if let Some(level) = selected_level.get() {
-            messages
-                .into_iter()
-                .filter(|msg| msg.level == level)
-                .collect()
+            // Use hierarchical filtering (selected level and higher priority levels)
+            let mut filtered = filter_messages_by_level_hierarchy(&messages, level);
+            // Sort in reverse chronological order (newest first)
+            filtered.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+            filtered
         } else {
-            messages
+            // Show all messages in reverse chronological order
+            filter_and_reverse_messages(&messages, None)
         }
     };
 
@@ -211,14 +326,8 @@ pub fn LoggingConsole() -> impl IntoView {
         });
     };
 
-    // Refresh logs manually
-    let refresh_logs = move || {
-        spawn_local(async move {
-            if let Ok(messages) = DebugManager::get_log_messages().await {
-                set_log_messages.set(messages);
-            }
-        });
-    };
+    // Manual refresh logs (for the button)
+    let refresh_logs = move || do_refresh();
 
     view! {
         <div class="logging-console">
@@ -266,6 +375,15 @@ pub fn LoggingConsole() -> impl IntoView {
                             on:change=move |e| set_auto_scroll.set(event_target_checked(&e))
                         />
                         "Auto-scroll"
+                    </label>
+
+                    <label class="auto-refresh-toggle">
+                        <input
+                            type="checkbox"
+                            checked={move || auto_refresh_enabled.get()}
+                            on:change=move |e| set_auto_refresh_enabled.set(event_target_checked(&e))
+                        />
+                        "Auto-refresh"
                     </label>
 
                     <button class="refresh-logs-btn" on:click=move |_| refresh_logs()>
@@ -549,5 +667,148 @@ mod tests {
         let _start_ptr = _start_fn as *const ();
         let _stop_ptr = _stop_fn as *const ();
         assert!(!_start_ptr.is_null() && !_stop_ptr.is_null());
+    }
+
+    // TDD: Test for reverse log order functionality
+    #[test]
+    fn test_filtered_messages_should_be_in_reverse_chronological_order() {
+        // RED: This test should fail initially because we don't have reverse ordering yet
+        let messages = vec![
+            LogMessage {
+                timestamp: "2024-01-01T10:00:00Z".to_string(),
+                level: LogLevel::Info,
+                target: "test".to_string(),
+                message: "First message".to_string(),
+            },
+            LogMessage {
+                timestamp: "2024-01-01T11:00:00Z".to_string(),
+                level: LogLevel::Info,
+                target: "test".to_string(),
+                message: "Second message".to_string(),
+            },
+            LogMessage {
+                timestamp: "2024-01-01T12:00:00Z".to_string(),
+                level: LogLevel::Info,
+                target: "test".to_string(),
+                message: "Third message".to_string(),
+            },
+        ];
+
+        // Function to filter and reverse messages (doesn't exist yet)
+        let filtered = filter_and_reverse_messages(&messages, None);
+
+        // Should be in reverse chronological order (newest first)
+        assert_eq!(filtered[0].message, "Third message");
+        assert_eq!(filtered[1].message, "Second message");
+        assert_eq!(filtered[2].message, "First message");
+    }
+
+    #[test]
+    fn test_log_level_hierarchy_should_include_higher_levels() {
+        // RED: This test should fail initially because we don't have hierarchical filtering yet
+
+        // Test that WARN level shows both WARN and ERROR
+        let messages = vec![
+            LogMessage {
+                timestamp: "2024-01-01T10:00:00Z".to_string(),
+                level: LogLevel::Debug,
+                target: "test".to_string(),
+                message: "Debug message".to_string(),
+            },
+            LogMessage {
+                timestamp: "2024-01-01T11:00:00Z".to_string(),
+                level: LogLevel::Info,
+                target: "test".to_string(),
+                message: "Info message".to_string(),
+            },
+            LogMessage {
+                timestamp: "2024-01-01T12:00:00Z".to_string(),
+                level: LogLevel::Warn,
+                target: "test".to_string(),
+                message: "Warn message".to_string(),
+            },
+            LogMessage {
+                timestamp: "2024-01-01T13:00:00Z".to_string(),
+                level: LogLevel::Error,
+                target: "test".to_string(),
+                message: "Error message".to_string(),
+            },
+        ];
+
+        let filtered = filter_messages_by_level_hierarchy(&messages, LogLevel::Warn);
+
+        // Should include WARN and ERROR, but not DEBUG and INFO
+        assert_eq!(filtered.len(), 2);
+        assert!(filtered.iter().any(|m| matches!(m.level, LogLevel::Warn)));
+        assert!(filtered.iter().any(|m| matches!(m.level, LogLevel::Error)));
+        assert!(!filtered.iter().any(|m| matches!(m.level, LogLevel::Debug)));
+        assert!(!filtered.iter().any(|m| matches!(m.level, LogLevel::Info)));
+    }
+
+    #[test]
+    fn test_log_level_hierarchy_error_shows_only_error() {
+        // RED: This test should fail initially
+        let messages = vec![
+            LogMessage {
+                timestamp: "2024-01-01T12:00:00Z".to_string(),
+                level: LogLevel::Warn,
+                target: "test".to_string(),
+                message: "Warn message".to_string(),
+            },
+            LogMessage {
+                timestamp: "2024-01-01T13:00:00Z".to_string(),
+                level: LogLevel::Error,
+                target: "test".to_string(),
+                message: "Error message".to_string(),
+            },
+        ];
+
+        let filtered = filter_messages_by_level_hierarchy(&messages, LogLevel::Error);
+
+        // Should include only ERROR
+        assert_eq!(filtered.len(), 1);
+        assert!(filtered.iter().any(|m| matches!(m.level, LogLevel::Error)));
+    }
+
+    #[test]
+    fn test_log_level_hierarchy_trace_shows_all_levels() {
+        // RED: This test should fail initially
+        let messages = vec![
+            LogMessage {
+                timestamp: "2024-01-01T09:00:00Z".to_string(),
+                level: LogLevel::Trace,
+                target: "test".to_string(),
+                message: "Trace message".to_string(),
+            },
+            LogMessage {
+                timestamp: "2024-01-01T10:00:00Z".to_string(),
+                level: LogLevel::Debug,
+                target: "test".to_string(),
+                message: "Debug message".to_string(),
+            },
+            LogMessage {
+                timestamp: "2024-01-01T11:00:00Z".to_string(),
+                level: LogLevel::Info,
+                target: "test".to_string(),
+                message: "Info message".to_string(),
+            },
+            LogMessage {
+                timestamp: "2024-01-01T12:00:00Z".to_string(),
+                level: LogLevel::Warn,
+                target: "test".to_string(),
+                message: "Warn message".to_string(),
+            },
+            LogMessage {
+                timestamp: "2024-01-01T13:00:00Z".to_string(),
+                level: LogLevel::Error,
+                target: "test".to_string(),
+                message: "Error message".to_string(),
+            },
+        ];
+
+        let filtered = filter_messages_by_level_hierarchy(&messages, LogLevel::Trace);
+
+        // Should include all levels
+        assert_eq!(filtered.len(), 5);
     }
 }

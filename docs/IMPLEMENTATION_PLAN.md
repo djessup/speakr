@@ -68,8 +68,8 @@ Reference: [FR-9 Auto-update](specs/FR-9-auto-update.md)
 
 ## Progress Checklist
 
-- [ ] 0. Preparation complete
-- [ ] 1. Repository scaffold merged ([INIT-01](specs/INIT-01-project-scaffold.md))
+- [x] 0. Preparation complete
+- [x] 1. Repository scaffold merged ([INIT-01](specs/INIT-01-project-scaffold.md))
 - [ ] 2.1 Audio capture ([FR-2](specs/FR-2-audio-capture.md)) implemented & tested
 - [ ] 2.2 Transcription ([FR-3](specs/FR-3-transcription.md)) implemented & tested
 - [ ] 2.3 Text injection ([FR-4](specs/FR-4-text-injection.md)) implemented & tested
