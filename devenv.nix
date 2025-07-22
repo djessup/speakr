@@ -25,6 +25,12 @@ in
     TAURI_SKIP_DEVSERVER_CHECK = "true";
     # Frontend development
     TRUNK_SERVE_PORT = "1420";
+
+    # macOS linking fix - expose library and include paths
+    LIBRARY_PATH = "${pkgs.darwin.libiconv}/lib:${pkgs.lib.makeLibraryPath [ pkgs.darwin.libiconv ]}";
+    CPATH = "${pkgs.darwin.libiconv}/include";
+    LDFLAGS = "-L${pkgs.darwin.libiconv}/lib";
+    CPPFLAGS = "-I${pkgs.darwin.libiconv}/include";
   };
 
   # Language configurations
@@ -37,6 +43,11 @@ in
         "wasm32-unknown-unknown" # Required for Leptos WebAssembly
       ];
     };
+    # Node.js configuration
+    javascript = {
+      enable = true;
+      package = pkgs.nodejs_20;
+    };
   };
 
   # Development packages
@@ -46,6 +57,12 @@ in
     curl
     wget
     jq
+
+    # macOS-specific libraries
+    darwin.libiconv
+    # darwin.apple_sdk.frameworks.Security
+    # darwin.apple_sdk.frameworks.CoreFoundation
+    # darwin.apple_sdk.frameworks.SystemConfiguration
 
     # Rust ecosystem tools
     cargo-watch # Auto-rebuild on file changes
