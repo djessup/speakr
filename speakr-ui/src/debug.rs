@@ -293,7 +293,7 @@ pub fn LoggingConsole() -> impl IntoView {
                         );
                         let _ = wasm_bindgen_futures::JsFuture::from(promise).await;
 
-                        if !auto_refresh_enabled.get() {
+                        if !auto_refresh_enabled.get_untracked() {
                             break;
                         }
                         do_refresh();
@@ -354,18 +354,21 @@ pub fn LoggingConsole() -> impl IntoView {
                         }
                     >
                         <option value="all" selected={move || selected_level.get().is_none()}>"All Levels"</option>
-                        {LogLevel::all().into_iter().map(|level| {
-                            let level_str = level.display_name().to_lowercase();
-                            let is_selected = selected_level.get().as_ref() == Some(&level);
-                            view! {
-                                <option
-                                    value={level_str.clone()}
-                                    selected={is_selected}
-                                >
-                                    {format!("{} {}", level.icon(), level.display_name())}
-                                </option>
-                            }
-                        }).collect::<Vec<_>>()}
+                        {move || {
+                            let current_level = selected_level.get();
+                            LogLevel::all().into_iter().map(|level| {
+                                let level_str = level.display_name().to_lowercase();
+                                let is_selected = current_level.as_ref() == Some(&level);
+                                view! {
+                                    <option
+                                        value={level_str.clone()}
+                                        selected={is_selected}
+                                    >
+                                        {format!("{} {}", level.icon(), level.display_name())}
+                                    </option>
+                                }
+                            }).collect::<Vec<_>>()
+                        }}
                     </select>
 
                     <label class="auto-scroll-toggle">
