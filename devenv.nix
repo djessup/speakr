@@ -261,7 +261,7 @@ in
             printf "==== %s =======================================================\n", header;
             current = grp;
           }
-          printf "     %-20s - %s\n", name, desc;
+          printf "     \033[1;36m%-20s\033[0m - %s\n", name, desc;
         }'
 
       echo ""
