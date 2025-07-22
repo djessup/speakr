@@ -34,7 +34,8 @@ tokio = { version = "1", features = [
 ] } # Async runtime for debug commands
 chrono = { version = "0.4", features = [
     "serde",
-] } # Timestamps for debug log messages
+    "wasm-bindgen",
+] } # Timestamps for debug log messages and WASM compatibility
 hound = "3.5" # WAV file writing library
 
 [dev-dependencies]

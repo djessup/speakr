@@ -242,10 +242,7 @@ impl BackendStatus {
             audio_capture: ServiceStatus::Starting,
             transcription: ServiceStatus::Starting,
             text_injection: ServiceStatus::Starting,
-            timestamp: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_millis() as u64,
+            timestamp: chrono::Utc::now().timestamp_millis() as u64,
         }
     }
 
@@ -255,10 +252,7 @@ impl BackendStatus {
             audio_capture: ServiceStatus::Ready,
             transcription: ServiceStatus::Ready,
             text_injection: ServiceStatus::Ready,
-            timestamp: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_millis() as u64,
+            timestamp: chrono::Utc::now().timestamp_millis() as u64,
         }
     }
 }

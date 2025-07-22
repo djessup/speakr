@@ -1230,11 +1230,8 @@ impl BackendStatusService {
     /// Updates the status of a specific service component
     pub fn update_service_status(&mut self, component: ServiceComponent, status: ServiceStatus) {
         if let Ok(mut current_status) = self.status.lock() {
-            // Update timestamp when any service changes
-            current_status.timestamp = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_millis() as u64;
+            // Update timestamp when any service changes (WASM-compatible)
+            current_status.timestamp = chrono::Utc::now().timestamp_millis() as u64;
 
             // Update the specific service
             match component {

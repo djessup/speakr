@@ -84,22 +84,49 @@ impl SettingsManager {
 
     /// Validates a hot-key combination
     pub async fn validate_hot_key(hot_key: &str) -> Result<(), SettingsError> {
-        // Pass the hot_key string directly to match the Tauri command signature
-        tauri_invoke::<(), _>("validate_hot_key", &hot_key.to_string())
+        // Tauri commands expect parameters wrapped in an object with the parameter name as key
+        #[derive(serde::Serialize)]
+        struct ValidateHotKeyArgs {
+            #[serde(rename = "hotKey")]
+            hot_key: String,
+        }
+
+        let args = ValidateHotKeyArgs {
+            hot_key: hot_key.to_string(),
+        };
+
+        tauri_invoke::<(), _>("validate_hot_key", &args)
             .await
             .map_err(|e| format!("Invalid hot-key: {e}"))
     }
 
     /// Checks model availability
     pub async fn check_model_availability(model_size: &str) -> Result<bool, SettingsError> {
-        // Pass the model_size string directly to match the Tauri command signature
-        tauri_invoke("check_model_availability", &model_size.to_string()).await
+        // Tauri commands expect parameters wrapped in an object with the parameter name as key
+        #[derive(serde::Serialize)]
+        struct CheckModelArgs {
+            #[serde(rename = "modelSize")]
+            model_size: String,
+        }
+
+        let args = CheckModelArgs {
+            model_size: model_size.to_string(),
+        };
+
+        tauri_invoke("check_model_availability", &args).await
     }
 
     /// Sets auto-launch preference
     pub async fn set_auto_launch(enable: bool) -> Result<(), SettingsError> {
-        // Pass the boolean directly to match the Tauri command signature
-        tauri_invoke::<(), _>("set_auto_launch", &enable).await
+        // Tauri commands expect parameters wrapped in an object with the parameter name as key
+        #[derive(serde::Serialize)]
+        struct SetAutoLaunchArgs {
+            enable: bool,
+        }
+
+        let args = SetAutoLaunchArgs { enable };
+
+        tauri_invoke::<(), _>("set_auto_launch", &args).await
     }
 }
 
