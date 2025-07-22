@@ -37,6 +37,17 @@ pub const MAX_ALLOWED_DURATION_SECS: u32 = 30;
 /// Bit depth for audio samples (16-bit).
 pub const SAMPLE_BIT_DEPTH: u16 = 16;
 
+/// Information about an audio input device.
+#[derive(Debug, Clone, PartialEq)]
+pub struct AudioDevice {
+    /// Unique identifier for the device
+    pub id: String,
+    /// Human-readable name of the device
+    pub name: String,
+    /// Whether this is the system default input device
+    pub is_default: bool,
+}
+
 /// Errors that can occur during audio capture.
 #[derive(Debug, Error, Clone, PartialEq)]
 pub enum AudioCaptureError {
@@ -173,6 +184,18 @@ pub trait AudioSystem: Send + Sync {
         &self,
         config: &RecordingConfig,
     ) -> Result<Box<dyn AudioStream>, AudioCaptureError>;
+
+    /// List all available audio input devices.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` containing a vector of `AudioDevice` or an error
+    ///
+    /// # Errors
+    ///
+    /// Returns `AudioCaptureError::MicrophoneNotAvailable` if no input devices are found,
+    /// or `AudioCaptureError::DeviceError` if device enumeration fails.
+    fn list_input_devices(&self) -> Result<Vec<AudioDevice>, AudioCaptureError>;
 }
 
 /// Trait for audio stream management.
@@ -274,7 +297,7 @@ impl AudioSystem for CpalAudioSystem {
                                 let mut samples_guard = samples_clone.lock().unwrap();
                                 for &sample in data {
                                     // Convert f32 to i16 and store
-                                    let sample_i16 = (sample * i16::MAX as f32) as i16;
+                                    let sample_i16 = (sample * (i16::MAX as f32)) as i16;
                                     samples_guard.push(sample_i16);
                                 }
                             }
@@ -306,7 +329,7 @@ impl AudioSystem for CpalAudioSystem {
                                 let mut samples_guard = samples_clone.lock().unwrap();
                                 for &sample in data {
                                     // Convert u16 to i16
-                                    let sample_i16 = (sample as i32 - 32768) as i16;
+                                    let sample_i16 = ((sample as i32) - 32768) as i16;
                                     samples_guard.push(sample_i16);
                                 }
                             }
@@ -337,6 +360,43 @@ impl AudioSystem for CpalAudioSystem {
             samples,
             is_recording,
         }))
+    }
+
+    fn list_input_devices(&self) -> Result<Vec<AudioDevice>, AudioCaptureError> {
+        let devices = self
+            .host
+            .input_devices()
+            .map_err(|e| AudioCaptureError::DeviceError(e.to_string()))?;
+
+        let default_device = self.host.default_input_device();
+        let default_device_name = default_device
+            .as_ref()
+            .and_then(|d| d.name().ok())
+            .unwrap_or_default();
+
+        let mut audio_devices = Vec::new();
+        for device in devices {
+            let name = device.name().map_err(|e| {
+                AudioCaptureError::DeviceError(format!("Could not get device name: {e}"))
+            })?;
+
+            let is_default = name == default_device_name;
+
+            // Use device name as ID since cpal doesn't provide device IDs
+            let id = name.clone();
+
+            audio_devices.push(AudioDevice {
+                id,
+                name,
+                is_default,
+            });
+        }
+
+        if audio_devices.is_empty() {
+            return Err(AudioCaptureError::MicrophoneNotAvailable);
+        }
+
+        Ok(audio_devices)
     }
 }
 
@@ -543,6 +603,24 @@ impl AudioRecorder {
             Some(state) => state.stream.is_active(),
             None => false,
         }
+    }
+
+    /// Lists all available audio input devices.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` containing a vector of `AudioDevice` or an error
+    ///
+    /// # Errors
+    ///
+    /// Returns `AudioCaptureError::MicrophoneNotAvailable` if no input devices are found,
+    /// or `AudioCaptureError::DeviceError` if device enumeration fails.
+    #[instrument(level = "debug", skip(self))]
+    pub async fn list_input_devices(&self) -> Result<Vec<AudioDevice>, AudioCaptureError> {
+        debug!("Listing available input devices");
+        let devices = self.audio_system.list_input_devices()?;
+        info!(device_count = devices.len(), "Found input devices");
+        Ok(devices)
     }
 }
 

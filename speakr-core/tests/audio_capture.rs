@@ -8,7 +8,7 @@
 //! - Permission dialog appears once and records decision
 
 use speakr_core::audio::{
-    AudioCaptureError, AudioRecorder, RecordingConfig, CHANNELS, SAMPLE_RATE_HZ,
+    AudioCaptureError, AudioDevice, AudioRecorder, RecordingConfig, CHANNELS, SAMPLE_RATE_HZ,
 };
 use std::time::{Duration, Instant};
 use tokio_test::assert_ok;
@@ -58,6 +58,7 @@ mod unit_tests {
     struct MockAudioSystem {
         should_fail: bool,
         mock_samples: Vec<i16>,
+        mock_devices: Vec<AudioDevice>,
     }
 
     impl MockAudioSystem {
@@ -65,6 +66,18 @@ mod unit_tests {
             Self {
                 should_fail: false,
                 mock_samples: vec![],
+                mock_devices: vec![
+                    AudioDevice {
+                        id: "device_1".to_string(),
+                        name: "Built-in Microphone".to_string(),
+                        is_default: true,
+                    },
+                    AudioDevice {
+                        id: "device_2".to_string(),
+                        name: "External USB Microphone".to_string(),
+                        is_default: false,
+                    },
+                ],
             }
         }
 
@@ -72,20 +85,36 @@ mod unit_tests {
             Self {
                 should_fail: true,
                 mock_samples: vec![],
+                mock_devices: vec![],
             }
         }
 
         fn with_samples(samples: Vec<i16>) -> Self {
-            Self {
-                should_fail: false,
-                mock_samples: samples,
-            }
+            let mut system = Self::new();
+            system.mock_samples = samples;
+            system
         }
 
         fn with_duration_samples(duration_ms: u32) -> Self {
-            let sample_count = (duration_ms as f32 / 1000.0 * SAMPLE_RATE_HZ as f32) as usize;
+            let sample_count = (((duration_ms as f32) / 1000.0) * (SAMPLE_RATE_HZ as f32)) as usize;
             let samples = (0..sample_count).map(|i| (i % 1000) as i16).collect();
             Self::with_samples(samples)
+        }
+
+        fn with_no_devices() -> Self {
+            Self {
+                should_fail: false,
+                mock_samples: vec![],
+                mock_devices: vec![],
+            }
+        }
+
+        fn with_custom_devices(devices: Vec<AudioDevice>) -> Self {
+            Self {
+                should_fail: false,
+                mock_samples: vec![],
+                mock_devices: devices,
+            }
         }
     }
 
@@ -99,6 +128,20 @@ mod unit_tests {
             }
 
             Ok(Box::new(MockAudioStream::new(self.mock_samples.clone())))
+        }
+
+        fn list_input_devices(&self) -> Result<Vec<AudioDevice>, AudioCaptureError> {
+            if self.should_fail {
+                return Err(AudioCaptureError::DeviceError(
+                    "Failed to enumerate devices".to_string(),
+                ));
+            }
+
+            if self.mock_devices.is_empty() {
+                return Err(AudioCaptureError::MicrophoneNotAvailable);
+            }
+
+            Ok(self.mock_devices.clone())
         }
     }
 
@@ -293,7 +336,7 @@ mod unit_tests {
 
         // Assert
         let samples = result.samples();
-        let expected_samples = (0.5 * SAMPLE_RATE_HZ as f32) as usize;
+        let expected_samples = (0.5 * (SAMPLE_RATE_HZ as f32)) as usize;
         let tolerance = expected_samples / 10; // 10% tolerance
 
         assert!(
@@ -335,6 +378,107 @@ mod unit_tests {
             .await
             .expect("Failed to stop second recording");
         assert!(!result2.samples().is_empty());
+    }
+
+    /// 🔴 RED: Test that we can list available input devices
+    #[tokio::test]
+    async fn lists_available_input_devices() {
+        // Arrange
+        let mock_system = Box::new(MockAudioSystem::new());
+        let recorder = AudioRecorder::with_audio_system(mock_system);
+
+        // Act
+        let result = recorder.list_input_devices().await;
+
+        // Assert
+        assert_ok!(result.as_ref());
+        let devices = result.unwrap();
+        assert_eq!(devices.len(), 2, "Should return two mock devices");
+
+        assert_eq!(devices[0].id, "device_1");
+        assert_eq!(devices[0].name, "Built-in Microphone");
+        assert!(devices[0].is_default);
+
+        assert_eq!(devices[1].id, "device_2");
+        assert_eq!(devices[1].name, "External USB Microphone");
+        assert!(!devices[1].is_default);
+    }
+
+    /// 🔴 RED: Test that at least one device is marked as default
+    #[tokio::test]
+    async fn exactly_one_device_is_marked_as_default() {
+        // Arrange
+        let mock_system = Box::new(MockAudioSystem::new());
+        let recorder = AudioRecorder::with_audio_system(mock_system);
+
+        // Act
+        let result = recorder.list_input_devices().await;
+
+        // Assert
+        assert_ok!(result.as_ref());
+        let devices = result.unwrap();
+        let default_count = devices.iter().filter(|d| d.is_default).count();
+        assert_eq!(
+            default_count, 1,
+            "Exactly one device should be marked as default"
+        );
+    }
+
+    /// 🔴 RED: Test error handling when no devices are available
+    #[tokio::test]
+    async fn handles_no_devices_available_error() {
+        // Arrange
+        let mock_system = Box::new(MockAudioSystem::with_no_devices());
+        let recorder = AudioRecorder::with_audio_system(mock_system);
+
+        // Act
+        let result = recorder.list_input_devices().await;
+
+        // Assert
+        assert!(matches!(
+            result,
+            Err(AudioCaptureError::MicrophoneNotAvailable)
+        ));
+    }
+
+    /// 🔴 RED: Test error handling when device enumeration fails
+    #[tokio::test]
+    async fn handles_device_enumeration_failure() {
+        // Arrange
+        let mock_system = Box::new(MockAudioSystem::with_failure());
+        let recorder = AudioRecorder::with_audio_system(mock_system);
+
+        // Act
+        let result = recorder.list_input_devices().await;
+
+        // Assert
+        assert!(matches!(result, Err(AudioCaptureError::DeviceError(_))));
+    }
+
+    /// 🔴 RED: Test that device information contains required fields
+    #[tokio::test]
+    async fn device_info_contains_required_fields() {
+        // Arrange
+        let custom_devices = vec![AudioDevice {
+            id: "test_device".to_string(),
+            name: "Test Microphone".to_string(),
+            is_default: true,
+        }];
+        let mock_system = Box::new(MockAudioSystem::with_custom_devices(custom_devices));
+        let recorder = AudioRecorder::with_audio_system(mock_system);
+
+        // Act
+        let result = recorder.list_input_devices().await;
+
+        // Assert
+        assert_ok!(result.as_ref());
+        let devices = result.unwrap();
+        assert_eq!(devices.len(), 1);
+
+        let device = &devices[0];
+        assert!(!device.id.is_empty(), "Device ID should not be empty");
+        assert!(!device.name.is_empty(), "Device name should not be empty");
+        // is_default can be true or false, both are valid
     }
 }
 
