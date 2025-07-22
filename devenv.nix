@@ -18,7 +18,7 @@ in
 
   # Define environment variables
   env = {
-    PROJECT_NAME = "speakr";
+    PROJECT_NAME = "Speakr";
     RUST_BACKTRACE = "1";
     RUST_LOG = "info";
     # Tauri development
@@ -31,6 +31,9 @@ in
     CPATH = "${pkgs.darwin.libiconv}/include";
     LDFLAGS = "-L${pkgs.darwin.libiconv}/lib";
     CPPFLAGS = "-I${pkgs.darwin.libiconv}/include";
+
+    # Suppress direnv export listings
+    DIRENV_LOG_FORMAT = "";
   };
 
   # Language configurations
@@ -70,6 +73,7 @@ in
     cargo-audit # Security auditing
     cargo-outdated # Check for outdated dependencies
     cargo-tauri # Tauri framework
+    cargo-tarpaulin # Code coverage for Rust
 
     # Tauri and frontend tools
     trunk # WebAssembly web application bundler
@@ -180,6 +184,10 @@ in
       description = "Update Rust dependencies";
       exec = "cargo update --workspace";
     };
+    coverage = {
+      description = "Run cargo coverage";
+      exec = "cargo tarpaulin --workspace --all-features --out Html --output-dir ./coverage";
+    };
 
     # Pre-commit setup
     pre-commit-install = {
@@ -187,7 +195,11 @@ in
       exec = "pre-commit install";
     };
     pre-commit-run = {
-      description = "Run all pre-commit hooks";
+      description = "Run pre-commit hooks on staged files";
+      exec = "pre-commit run";
+    };
+    pre-commit-run-all = {
+      description = "Run pre-commit hooks on all files";
       exec = "pre-commit run --all-files";
     };
   };
@@ -233,44 +245,52 @@ in
       ) config.scripts;
 
       scriptData = builtins.concatStringsSep "\n" scriptLines;
+
+      # Define custom group order and process each group
+      processGroups = ''
+        # Define group order and icons
+        declare -a GROUP_ORDER=("run" "build" "docs" "tools")
+        declare -A GROUP_ICONS=(
+          ["run"]="🚀 Run"
+          ["build"]="🔨 Build"
+          ["docs"]="📖 Docs"
+          ["tools"]="🧰 Utils"
+        )
+
+        # Process each group in custom order
+        for group in "''${GROUP_ORDER[@]}"; do
+          # Get commands for this group, sorted alphabetically by command name
+          group_commands=$(echo '${scriptData}' | grep "^$group|" | sort -t'|' -k2,2)
+
+          if [ -n "$group_commands" ]; then
+            if [ "$group" != "run" ]; then
+              echo ""
+            fi
+
+            header="''${GROUP_ICONS[$group]:-$(echo $group | sed 's/./\U&/')}"
+            printf "==== %s =======================================================\n" "$header"
+
+            echo "$group_commands" | while IFS='|' read -r grp name desc; do
+              # printf "     %-20s - %s\n" "$name" "$desc"
+              printf "     \033[1;36m%-20s\033[0m - %s\n" "$name" "$desc"
+            done
+          fi
+        done
+      '';
     in
     ''
-      echo "🦀 Welcome to ${config.env.PROJECT_NAME} development environment!"
-      echo ""
       echo "==== 📦 Toolchain ================================================="
-      echo "     Rust $(rustc --version)"
-      echo "     Trunk $(trunk --version)"
-      echo "     Tauri CLI $(cargo tauri --version 2>/dev/null || echo 'not installed')"
-      echo "     mdbook $(mdbook --version)"
+      echo "  🦀 Rust $(rustc --version)"
+      echo "  🌐 Trunk $(trunk --version)"
+      echo "  🔧 Tauri CLI $(cargo tauri --version 2>/dev/null || echo 'not installed')"
+      echo "  📖 mdbook $(mdbook --version)"
       echo ""
       echo ""
 
-      # Dynamically generate command sections
-      echo '${scriptData}' | sort -t'|' -k1,1 -k2,2 | awk -F'|' '
-        BEGIN {
-          icons["run"]   = "🚀 Run";
-          icons["build"] = "🔨 Build";
-          icons["docs"]  = "📖 Docs";
-          icons["tools"] = "🧰 Utils";
-        }
-        {
-          grp = $1; name = $2; desc = $3;
-          if (grp != current) {
-            if (NR > 1) print "";
-            header = (icons[grp] ? icons[grp] : toupper(substr(grp,1,1)) substr(grp,2));
-            printf "==== %s =======================================================\n", header;
-            current = grp;
-          }
-          printf "     \033[1;36m%-20s\033[0m - %s\n", name, desc;
-        }'
+      # Process groups in custom order
+      ${processGroups}
 
-      echo ""
-      echo "🔧 Setup steps (run once):"
-      echo "  1. pre-commit-install  - Install git hooks"
-      echo "  2. docs-install-plugins - Install mdbook plugins"
-      echo ""
-
-      # Check if this is the first run
+      # First-run setup
       if [ ! -f .devenv-initialized ]; then
         echo "🔄 First time setup..."
         echo "Installing pre-commit hooks..."
@@ -278,10 +298,14 @@ in
         echo "Installing documentation plugins..."
         docs-install-plugins 2>/dev/null || true
         touch .devenv-initialized
-        echo "✅ Setup complete!"
+        echo "✨ Setup complete!"
       fi
 
-      echo "Ready to develop! Run 'dev' to start the application."
+      echo ""
+      printf "🦀 Welcome to the \033[1;36m${config.env.PROJECT_NAME}\033[0m 🗣️  dev-env!\n"
+      echo ""
+      printf "Run \033[1;36mdev\033[0m to start the application.\n"
+      echo ""
     '';
 
 }
