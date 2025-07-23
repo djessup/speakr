@@ -2,3 +2,6 @@
 resolver = "2"
 members = ["speakr-types", "speakr-core", "speakr-tauri", "speakr-ui"]
 default-members = ["speakr-tauri", "speakr-core"]
+
+[profile.dev]
+incremental = true
