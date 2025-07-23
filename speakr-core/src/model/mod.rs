@@ -25,7 +25,7 @@ mod metadata;
 //
 pub use list::Model;
 pub use list_updater::ModelListUpdater;
-pub use metadata::ModelMetadata;
+pub use metadata::{filename_to_variant_name, ModelMetadata};
 
 // Only load the test file during testing
 #[cfg(test)]
