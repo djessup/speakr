@@ -67,14 +67,55 @@ Key points:
 
 ## 3. Crate & Directory Layout
 
-| Layer    | Crate / Path              | Main Responsibilities                                                             |
-| -------- | ------------------------- | --------------------------------------------------------------------------------- |
-| Core     | `speakr-core/`            | Record audio (cpal) ➜ transcribe (whisper-rs) ➜ inject text (enigo)               |
-| Backend  | `speakr-tauri/`    | Registers global hot-key, exposes `#[tauri::command]` wrappers, persists settings        |
-| Frontend | `speakr-ui/` (optional)   | Leptos WASM UI for tray, preferences, status overlay                              |
-| Assets   | `models/`                 | GGUF Whisper models downloaded post-install                                       |
+| Layer    | Crate / Path            | Main Responsibilities                                                             |
+| -------- | ----------------------- | --------------------------------------------------------------------------------- |
+| Core     | `speakr-core/`          | Record audio (cpal) ➜ transcribe (whisper-rs) ➜ inject text (enigo)               |
+| Backend  | `speakr-tauri/`         | Registers global hot-key, exposes `#[tauri::command]` wrappers, persists settings |
+| Frontend | `speakr-ui/` (optional) | Leptos WASM UI for tray, preferences, status overlay                              |
+| Assets   | `models/`               | GGUF Whisper models downloaded post-install                                       |
 
 All crates live in a single **Cargo workspace** to guarantee compatible dependency versions.
+
+### 3.1 Speakr-Tauri Internal Structure
+
+The `speakr-tauri` backend is organised into focused modules for maintainability and testability:
+
+```text
+speakr-tauri/src/
+├── commands/           # Tauri command implementations
+│   ├── mod.rs         # Command organisation and documentation
+│   ├── validation.rs  # Input validation (hotkey format, etc.)
+│   ├── system.rs      # System integration (model availability, auto-launch)
+│   └── legacy.rs      # Backward compatibility commands
+├── services/          # Background services and state management
+│   ├── mod.rs         # Service coordination
+│   ├── hotkey.rs      # Global hotkey registration and management
+│   ├── status.rs      # Backend service status tracking
+│   └── types.rs       # Shared service types and enums
+├── settings/          # Configuration persistence and validation
+│   ├── mod.rs         # Settings management
+│   ├── persistence.rs # File I/O for settings
+│   ├── migration.rs   # Settings schema migration
+│   └── validation.rs  # Settings validation logic
+├── debug/             # Debug-only functionality
+│   ├── mod.rs         # Debug command coordination
+│   ├── commands.rs    # Debug-specific Tauri commands
+│   ├── storage.rs     # Debug log storage
+│   └── types.rs       # Debug-specific types
+├── audio/             # Audio handling utilities
+│   ├── mod.rs         # Audio module coordination
+│   ├── files.rs       # Audio file operations
+│   └── recording.rs   # Audio recording helpers
+└── lib.rs             # Tauri app setup, command registration
+```
+
+**Key architectural principles:**
+
+- **Separation of concerns**: Business logic in `*_internal()` functions, Tauri integration
+  in `lib.rs`
+- **Testability**: Internal functions can be tested without Tauri runtime overhead
+- **Modularity**: Commands grouped by functional domain rather than technical implementation
+- **Documentation**: Each module has comprehensive rustdoc explaining its purpose and usage
 
 ---
 

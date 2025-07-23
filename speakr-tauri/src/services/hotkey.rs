@@ -1,6 +1,6 @@
 //! Global hotkey service implementation.
 
-use speakr_types::{AppError, HotkeyConfig, HotkeyError};
+use speakr_types::{HotkeyConfig, HotkeyError};
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
@@ -147,35 +147,6 @@ impl GlobalHotkeyService {
 ///
 /// Returns `Ok(())` if valid.
 ///
-/// # Errors
-///
-/// Returns `AppError::HotKey` if the hot-key is invalid.
-///
-/// # Internal API
-/// This function is only intended for internal use and testing.
-pub async fn validate_hot_key_internal(hot_key: String) -> Result<(), AppError> {
-    if hot_key.is_empty() {
-        return Err(AppError::HotKey("Hot-key cannot be empty".to_string()));
-    }
-
-    // Enhanced validation - supports both old and new formats
-    let modifiers = ["CMD", "CMDORCTRL", "CTRL", "ALT", "OPTION", "SHIFT"];
-    let has_modifier = modifiers.iter().any(|m| hot_key.to_uppercase().contains(m));
-
-    if !has_modifier {
-        return Err(AppError::HotKey(
-            "Hot-key must contain at least one modifier key".to_string(),
-        ));
-    }
-
-    // 🟢 GREEN: Use Tauri's native shortcut parsing instead of custom logic
-    // This supports function keys (F1-F12), special keys, numeric keys, and all standard keys
-    match hot_key.parse::<Shortcut>() {
-        Ok(_) => Ok(()),
-        Err(e) => Err(AppError::HotKey(format!("Invalid shortcut format: {e}"))),
-    }
-}
-
 /// Register a global hotkey using the GlobalHotkeyService
 pub async fn register_global_hotkey_internal(
     app_handle: AppHandle,

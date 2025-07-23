@@ -7,6 +7,7 @@
 //! - Model file validation
 //! - System integration
 
+pub mod commands;
 pub mod services;
 pub mod settings;
 
@@ -16,14 +17,17 @@ pub mod debug;
 
 use services::{
     get_backend_status_internal,
-    hotkey::{
-        register_global_hotkey_internal, unregister_global_hotkey_internal,
-        validate_hot_key_internal,
-    },
+    hotkey::{register_global_hotkey_internal, unregister_global_hotkey_internal},
     update_service_status_internal, ServiceComponent,
 };
 
 use settings::{load_settings_internal, save_settings_internal};
+
+use commands::{
+    legacy::{greet_internal, register_hot_key_internal},
+    system::{check_model_availability_internal, set_auto_launch_internal},
+    validation::validate_hot_key_internal,
+};
 
 #[cfg(debug_assertions)]
 use debug::{
@@ -34,24 +38,10 @@ use debug::{
 
 // Audio functions are accessed through full module paths in tests
 
-#[cfg(test)]
-use services::{
-    get_global_backend_service, reset_global_backend_service, update_global_service_status,
-    BackendStatusService,
-};
-#[cfg(test)]
-use settings::{
-    get_settings_backup_path, get_settings_path, load_settings_from_dir, migrate_settings,
-    save_settings_to_dir, try_load_settings_file, validate_settings_directory_permissions,
-};
-
 use speakr_types::{AppError, AppSettings, HotkeyConfig, ServiceStatus, StatusUpdate};
 // File system and path utilities are used in specific functions only
-use tauri::AppHandle;
+use tauri::{AppHandle, Manager};
 use tracing::{error, info, warn};
-
-#[cfg(test)]
-use tracing::debug;
 
 // Core audio and WAV functionality is now in the audio module
 
@@ -102,38 +92,6 @@ async fn check_model_availability(model_size: String) -> Result<bool, AppError> 
     check_model_availability_internal(model_size).await
 }
 
-/// Checks if a model file exists for the given model size.
-///
-/// # Arguments
-///
-/// * `model_size` - The model size to check ("small", "medium", "large")
-///
-/// # Returns
-///
-/// Returns `true` if the model file exists, `false` otherwise.
-pub(crate) async fn check_model_availability_internal(
-    model_size: String,
-) -> Result<bool, AppError> {
-    let filename = match model_size.as_str() {
-        "small" => "ggml-small.bin",
-        "medium" => "ggml-medium.bin",
-        "large" => "ggml-large.bin",
-        _ => {
-            return Err(AppError::Settings(format!(
-                "Unknown model size: {model_size}"
-            )));
-        }
-    };
-
-    // Check in models directory relative to the app
-    let models_dir = std::env::current_dir()
-        .map_err(|e| AppError::FileSystem(format!("Failed to get current dir: {e}")))?
-        .join("models");
-
-    let model_path = models_dir.join(filename);
-    Ok(model_path.exists())
-}
-
 /// Registers a global hot-key with the system (simple interface).
 ///
 /// # Arguments
@@ -149,12 +107,7 @@ pub(crate) async fn check_model_availability_internal(
 /// Returns `AppError::HotKey` if registration fails.
 #[tauri::command]
 async fn register_hot_key(hot_key: String) -> Result<(), AppError> {
-    // Validate the hot-key first
-    validate_hot_key_internal(hot_key.clone()).await?;
-
-    // For now, just return success since the frontend handles registration
-    // This maintains backward compatibility
-    Ok(())
+    register_hot_key_internal(hot_key).await
 }
 
 /// Tauri command wrapper to register a global hotkey using the GlobalHotkeyService
@@ -184,10 +137,7 @@ async fn unregister_global_hotkey(app_handle: AppHandle) -> Result<(), String> {
 /// Returns `AppError` if the operation fails.
 #[tauri::command]
 async fn set_auto_launch(enable: bool) -> Result<(), AppError> {
-    // TODO: Implement actual auto-launch registration using system APIs
-    // For now, just return success
-    let _ = enable;
-    Ok(())
+    set_auto_launch_internal(enable).await
 }
 
 /// Debug command to test audio recording functionality.
@@ -215,47 +165,47 @@ async fn debug_test_audio_recording() -> Result<String, AppError> {
 ///
 /// # Returns
 ///
-/// Returns a success message indicating recording has started.
+/// Returns a success message when recording starts.
 ///
 /// # Errors
 ///
-/// Returns `AppError` if the operation fails.
+/// Returns `AppError` if recording fails to start.
 #[cfg(debug_assertions)]
 #[tauri::command]
 async fn debug_start_recording() -> Result<String, AppError> {
     debug_start_recording_internal().await
 }
 
-/// Debug command to stop push-to-talk recording and save to disk.
+/// Debug command to stop push-to-talk recording.
 ///
 /// This command is only available in debug builds and stops
-/// the current recording, then saves the audio to a timestamped WAV file.
+/// the current recording session.
 ///
 /// # Returns
 ///
-/// Returns a message with the file path where audio was saved.
+/// Returns a success message when recording stops.
 ///
 /// # Errors
 ///
-/// Returns `AppError` if the operation fails.
+/// Returns `AppError` if no recording is active or if stopping fails.
 #[cfg(debug_assertions)]
 #[tauri::command]
 async fn debug_stop_recording() -> Result<String, AppError> {
     debug_stop_recording_internal().await
 }
 
-/// Debug command to get recent log messages.
+/// Debug command to get all log messages.
 ///
 /// This command is only available in debug builds and returns
-/// the collected log messages for display in the debug console.
+/// all accumulated debug log messages for display in the frontend.
 ///
 /// # Returns
 ///
-/// Returns a vector of log messages.
+/// Returns a vector of debug log messages.
 ///
 /// # Errors
 ///
-/// Returns `AppError` if the operation fails.
+/// Returns `AppError` if retrieval fails.
 #[cfg(debug_assertions)]
 #[tauri::command]
 async fn debug_get_log_messages() -> Result<Vec<DebugLogMessage>, AppError> {
@@ -265,7 +215,7 @@ async fn debug_get_log_messages() -> Result<Vec<DebugLogMessage>, AppError> {
 /// Debug command to clear all log messages.
 ///
 /// This command is only available in debug builds and clears
-/// the collected log messages from memory.
+/// the accumulated debug log messages.
 ///
 /// # Returns
 ///
@@ -273,7 +223,7 @@ async fn debug_get_log_messages() -> Result<Vec<DebugLogMessage>, AppError> {
 ///
 /// # Errors
 ///
-/// Returns `AppError` if the operation fails.
+/// Returns `AppError` if clearing fails.
 #[cfg(debug_assertions)]
 #[tauri::command]
 async fn debug_clear_log_messages() -> Result<(), AppError> {
@@ -283,7 +233,7 @@ async fn debug_clear_log_messages() -> Result<(), AppError> {
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
 fn greet(name: &str) -> String {
-    format!("Hello, {name}! You've been greeted from Rust!")
+    greet_internal(name)
 }
 
 /// Tauri command to get current backend status
@@ -292,7 +242,7 @@ async fn get_backend_status() -> Result<StatusUpdate, AppError> {
     get_backend_status_internal().await
 }
 
-/// Tauri command to update a service component status
+/// Tauri command to update service status
 #[tauri::command]
 async fn update_service_status(
     component: ServiceComponent,
@@ -355,22 +305,31 @@ pub fn run() {
                     "speakr-tauri",
                     "Application starting in debug mode",
                 );
-                add_debug_log(
-                    DebugLogLevel::Debug,
-                    "speakr-tauri",
-                    "Debug logging system initialized",
+            }
+
+            info!("🎙️  Speakr backend starting up...");
+
+            // Set up default global hotkey
+            let app_handle = app.app_handle().clone();
+            tauri::async_runtime::spawn(async move {
+                // Default hotkey configuration
+                let default_config = HotkeyConfig {
+                    shortcut: "CmdOrCtrl+Alt+Space".to_string(),
+                    enabled: true,
+                };
+
+                info!(
+                    "⌨️  Registering default hotkey: {}",
+                    default_config.shortcut
                 );
+
+                #[cfg(debug_assertions)]
                 add_debug_log(
                     DebugLogLevel::Info,
                     "speakr-tauri",
-                    "Debug panel available via toggle button",
+                    &format!("Registering default hotkey: {}", default_config.shortcut),
                 );
-            }
 
-            // Register default hotkey on startup
-            let app_handle = app.handle().clone();
-            tauri::async_runtime::spawn(async move {
-                let default_config = HotkeyConfig::default();
                 if let Err(e) =
                     register_global_hotkey_internal(app_handle.clone(), default_config.clone())
                         .await
@@ -382,7 +341,7 @@ pub fn run() {
 
                     #[cfg(debug_assertions)]
                     add_debug_log(
-                        DebugLogLevel::Warn,
+                        DebugLogLevel::Error,
                         "speakr-tauri",
                         &format!("Failed to register default hotkey: {e}"),
                     );
@@ -438,824 +397,4 @@ pub fn run() {
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use speakr_types::ServiceStatus;
-
-    // test_app_settings_default moved to tests/settings_tests.rs
-
-    #[tokio::test]
-    async fn test_save_and_load_settings() {
-        // Use a temporary directory for this test to avoid interference
-        use tempfile::TempDir;
-
-        let temp_dir = TempDir::new().expect("Should create temp dir");
-        let temp_settings_path = temp_dir.path().join("settings.json");
-
-        // Arrange
-        let test_settings = AppSettings {
-            version: 1,
-            hot_key: "CmdOrCtrl+Alt+S".to_string(),
-            model_size: "large".to_string(),
-            auto_launch: true,
-        };
-
-        // Test the helper function directly since we can't override the global path
-        // Save settings to temp file
-        let json = serde_json::to_string_pretty(&test_settings).expect("Should serialize");
-        std::fs::write(&temp_settings_path, json).expect("Should write test file");
-
-        // Load and verify using our helper function
-        let loaded_settings =
-            try_load_settings_file(&temp_settings_path).expect("Should load test settings");
-        assert_eq!(loaded_settings, test_settings);
-
-        // Test migration works
-        let migrated = migrate_settings(loaded_settings);
-        assert_eq!(migrated, test_settings); // Should be unchanged since it's already version 1
-    }
-
-    #[tokio::test]
-    async fn test_settings_migration() {
-        // Test migration from version 0 to current
-        let old_settings = AppSettings {
-            version: 0,
-            ..Default::default()
-        };
-
-        let migrated = migrate_settings(old_settings);
-        assert_eq!(migrated.version, 1);
-
-        // Test current version (no migration)
-        let current_settings = AppSettings::default();
-        let unchanged = migrate_settings(current_settings.clone());
-        assert_eq!(unchanged, current_settings);
-    }
-
-    #[tokio::test]
-    async fn test_atomic_write_creates_backup() {
-        // Create initial settings
-        let initial_settings = AppSettings::default();
-        save_settings(initial_settings)
-            .await
-            .expect("Initial save should work");
-
-        // Verify main file exists
-        let settings_path = get_settings_path().expect("Should get settings path");
-        assert!(settings_path.exists(), "Main settings file should exist");
-
-        // Save different settings (should create backup)
-        let updated_settings = AppSettings {
-            version: 1,
-            hot_key: "CmdOrCtrl+Alt+T".to_string(),
-            model_size: "small".to_string(),
-            auto_launch: true,
-        };
-        save_settings(updated_settings.clone())
-            .await
-            .expect("Updated save should work");
-
-        // Verify backup was created
-        let backup_path = get_settings_backup_path().expect("Should get backup path");
-        assert!(backup_path.exists(), "Backup file should be created");
-
-        // Verify main file has new settings
-        let loaded = load_settings().await.expect("Should load updated settings");
-        assert_eq!(loaded, updated_settings);
-    }
-
-    #[tokio::test]
-    async fn test_corruption_recovery_from_backup() {
-        // Use isolated temporary directory instead of real settings path
-        use tempfile::TempDir;
-
-        let temp_dir = TempDir::new().expect("Should create temp dir");
-        let settings_dir = temp_dir.path().to_path_buf();
-
-        // Create good settings - first save creates main file, no backup yet
-        let good_settings = AppSettings::default();
-        save_settings_to_dir(&good_settings, &settings_dir)
-            .await
-            .expect("Should save initial");
-
-        let settings_path = settings_dir.join("settings.json");
-        let backup_path = settings_dir.join("settings.json.backup");
-
-        // First save doesn't create backup (no existing file to backup)
-        assert!(
-            !backup_path.exists(),
-            "Backup should NOT exist after first save"
-        );
-
-        // Second save creates backup of the existing file
-        save_settings_to_dir(&good_settings, &settings_dir)
-            .await
-            .expect("Should save second time");
-
-        // NOW backup should exist (created from the existing file during second save)
-        assert!(
-            backup_path.exists(),
-            "Backup should exist after second save"
-        );
-
-        // Corrupt the main file (backup should exist after second save)
-        std::fs::write(&settings_path, "invalid json").expect("Should corrupt main file");
-
-        // Load should recover from backup using isolated function
-        let recovered = load_settings_from_dir(&settings_dir)
-            .await
-            .expect("Should recover from backup");
-        assert_eq!(recovered, good_settings);
-
-        // Verify main file was restored
-        let reloaded = load_settings_from_dir(&settings_dir)
-            .await
-            .expect("Should load restored settings");
-        assert_eq!(reloaded, good_settings);
-    }
-
-    #[tokio::test]
-    async fn test_corruption_recovery_fallback_to_defaults() {
-        use tempfile::TempDir;
-
-        // Create a temporary directory for this test
-        let temp_dir = TempDir::new().expect("Should create temp dir");
-        let fake_settings_path = temp_dir.path().join("settings.json");
-        let fake_backup_path = temp_dir.path().join("settings.json.backup");
-
-        // Create both files with invalid content
-        std::fs::write(&fake_settings_path, "invalid json")
-            .expect("Should write corrupt main file");
-        std::fs::write(&fake_backup_path, "also invalid")
-            .expect("Should write corrupt backup file");
-
-        // Use the helper function directly since we can't easily override the paths in the command
-        let load_result_main = try_load_settings_file(&fake_settings_path);
-        assert!(
-            load_result_main.is_err(),
-            "Should fail to load corrupt main file"
-        );
-
-        let load_result_backup = try_load_settings_file(&fake_backup_path);
-        assert!(
-            load_result_backup.is_err(),
-            "Should fail to load corrupt backup file"
-        );
-
-        // In the real scenario, this would fall back to defaults
-        // The load_settings command handles this logic
-    }
-
-    #[tokio::test]
-    async fn test_validate_hot_key_success() {
-        // Arrange
-        let valid_keys = vec![
-            "CmdOrCtrl+Alt+Space".to_string(),
-            "Ctrl+Shift+F".to_string(),
-            "Alt+`".to_string(),
-            "CMD+SPACE".to_string(), // Legacy format support
-        ];
-
-        // Act & Assert
-        for key in valid_keys {
-            let result = validate_hot_key_internal(key.clone()).await;
-            assert!(result.is_ok(), "Should accept valid key: {key}");
-        }
-    }
-
-    #[tokio::test]
-    async fn test_validate_hot_key_failures() {
-        let invalid_keys = vec![
-            "".to_string(),      // Empty
-            "Space".to_string(), // No modifier
-            "A+B".to_string(),   // No modifier keys
-        ];
-
-        for key in invalid_keys {
-            let result = validate_hot_key_internal(key.clone()).await;
-            assert!(result.is_err(), "Should reject invalid key: {key}");
-        }
-    }
-
-    #[tokio::test]
-    async fn test_check_model_availability() {
-        // Act & Assert
-        let small_result = check_model_availability("small".to_string()).await;
-        assert!(small_result.is_ok());
-
-        let medium_result = check_model_availability("medium".to_string()).await;
-        assert!(medium_result.is_ok());
-
-        let large_result = check_model_availability("large".to_string()).await;
-        assert!(large_result.is_ok());
-
-        let invalid_result = check_model_availability("invalid".to_string()).await;
-        assert!(invalid_result.is_err());
-    }
-
-    #[tokio::test]
-    async fn test_register_hot_key() {
-        // Act
-        let result = register_hot_key("CmdOrCtrl+Alt+Space".to_string()).await;
-
-        // Assert
-        assert!(result.is_ok());
-    }
-
-    #[tokio::test]
-    async fn test_set_auto_launch() {
-        // Act
-        let enable_result = set_auto_launch(true).await;
-        let disable_result = set_auto_launch(false).await;
-
-        // Assert
-        assert!(enable_result.is_ok());
-        assert!(disable_result.is_ok());
-    }
-
-    // test_settings_serialization moved to tests/settings_tests.rs
-
-    // debug_save_button_functionality moved to tests/settings_tests.rs
-
-    #[tokio::test]
-    async fn test_save_settings_tauri_command() {
-        // This test should use test isolation instead of the production save_settings command
-        // For now, mark it as todo since the Tauri command uses real system paths
-        // The proper implementation would require dependency injection in the Tauri command
-
-        debug!("🔧 Debug: Testing save_settings with proper isolation...");
-
-        let test_settings = AppSettings {
-            version: 1,
-            hot_key: "CmdOrCtrl+Alt+C".to_string(),
-            model_size: "small".to_string(),
-            auto_launch: false,
-        };
-
-        debug!("⚙️  Test settings: {:?}", test_settings);
-
-        // Use the isolated function instead of the Tauri command that hits real filesystem
-        let temp_dir = tempfile::TempDir::new().expect("Should create temp dir");
-        let settings_dir = temp_dir.path().to_path_buf();
-
-        match save_settings_to_dir(&test_settings, &settings_dir).await {
-            Ok(()) => {
-                debug!("✅ Isolated save succeeded!");
-
-                // Verify we can load it back
-                match load_settings_from_dir(&settings_dir).await {
-                    Ok(loaded_settings) => {
-                        debug!("📖 Loaded settings: {:?}", loaded_settings);
-                        assert_eq!(loaded_settings.model_size, test_settings.model_size);
-                        assert_eq!(loaded_settings.auto_launch, test_settings.auto_launch);
-                        debug!("✅ Settings were correctly saved and loaded with isolation!");
-                    }
-                    Err(e) => {
-                        debug!("❌ Failed to load settings after save: {}", e);
-                        panic!("Should be able to load settings after isolated save");
-                    }
-                }
-            }
-            Err(e) => {
-                debug!("❌ Isolated save failed: {}", e);
-                panic!("Isolated save should work in test environment");
-            }
-        }
-    }
-
-    #[tokio::test]
-    async fn test_settings_performance() {
-        use std::time::Instant;
-        use tempfile::TempDir;
-
-        let temp_dir = TempDir::new().expect("Should create temp dir");
-        let temp_settings_path = temp_dir.path().join("settings.json");
-        let settings = AppSettings::default();
-
-        // Test that save completes within 100ms (FR-8 requirement)
-        let start = Instant::now();
-
-        // Test the actual file operations that happen in save_settings
-        let json = serde_json::to_string_pretty(&settings).expect("Should serialize");
-        let temp_path = temp_settings_path.with_extension("json.tmp");
-        std::fs::write(&temp_path, &json).expect("Should write temp file");
-        std::fs::rename(&temp_path, &temp_settings_path).expect("Should rename file");
-
-        let duration = start.elapsed();
-
-        assert!(
-            duration.as_millis() < 100,
-            "Settings save should complete within 100ms, took {}ms",
-            duration.as_millis()
-        );
-
-        // Verify the file was written correctly
-        let loaded =
-            try_load_settings_file(&temp_settings_path).expect("Should load saved settings");
-        assert_eq!(loaded, settings);
-    }
-
-    #[tokio::test]
-    async fn test_settings_directory_permissions() {
-        // RED: This test should fail initially since we haven't implemented permission validation
-        use tempfile::TempDir;
-
-        let temp_dir = TempDir::new().expect("Should create temp dir");
-        let settings_path = temp_dir.path().join("settings.json");
-
-        // Test that we can detect and handle permission issues
-        // This should fail initially because we don't have permission validation
-        let result = validate_settings_directory_permissions(settings_path.parent().unwrap());
-
-        // This should pass once we implement the function
-        assert!(result.is_ok(), "Should validate directory permissions");
-    }
-
-    #[tokio::test]
-    async fn test_isolated_settings_save_and_load() {
-        // RED: This should fail because these functions don't exist yet
-        use tempfile::TempDir;
-
-        let temp_dir = TempDir::new().expect("Should create temp dir");
-        let settings_dir = temp_dir.path().to_path_buf();
-
-        let test_settings = AppSettings {
-            version: 1,
-            hot_key: "CmdOrCtrl+Alt+T".to_string(),
-            model_size: "large".to_string(),
-            auto_launch: true,
-        };
-
-        // These functions should accept directory paths to enable test isolation
-        save_settings_to_dir(&test_settings, &settings_dir)
-            .await
-            .expect("Should save to test dir");
-        let loaded = load_settings_from_dir(&settings_dir)
-            .await
-            .expect("Should load from test dir");
-
-        assert_eq!(loaded, test_settings);
-    }
-
-    #[tokio::test]
-    async fn test_isolated_corruption_recovery() {
-        // RED: This should fail because these functions don't exist yet
-        use tempfile::TempDir;
-
-        let temp_dir = TempDir::new().expect("Should create temp dir");
-        let settings_dir = temp_dir.path().to_path_buf();
-
-        // Create good settings and backup
-        let good_settings = AppSettings::default();
-        save_settings_to_dir(&good_settings, &settings_dir)
-            .await
-            .expect("Should save initial");
-
-        let settings_path = settings_dir.join("settings.json");
-        let _backup_path = settings_dir.join("settings.json.backup");
-
-        // Corrupt main file (backup should exist after first save)
-        std::fs::write(&settings_path, "invalid json").expect("Should corrupt main file");
-
-        // Load should recover from backup
-        let recovered = load_settings_from_dir(&settings_dir)
-            .await
-            .expect("Should recover");
-        assert_eq!(recovered, good_settings);
-    }
-
-    #[tokio::test]
-    async fn test_get_backend_status_tauri_command() {
-        // This would test the Tauri command interface
-        // We can't easily test the Tauri command without a full Tauri context,
-        // so for now we test the underlying service directly
-        let service = BackendStatusService::new();
-        let status = service.get_current_status();
-
-        assert!(!status.is_ready()); // Should start with services not ready
-    }
-
-    // TDD: Tests for audio recording with file saving functionality
-    #[tokio::test]
-    async fn test_debug_record_audio_to_file_saves_with_timestamp() {
-        use std::time::SystemTime;
-        use tempfile::TempDir;
-
-        // Arrange
-        let temp_dir = TempDir::new().expect("Should create temp dir");
-        let output_dir = temp_dir.path();
-
-        let before_recording = SystemTime::now();
-
-        // Act
-        let file_path = crate::audio::recording::debug_record_audio_to_file(output_dir, 2)
-            .await
-            .expect("Should record audio to file");
-
-        let after_recording = SystemTime::now();
-
-        // Assert
-        assert!(file_path.exists(), "Audio file should be created");
-        assert!(
-            file_path.extension().unwrap_or_default() == "wav",
-            "Should create WAV file"
-        );
-
-        // Check timestamp in filename
-        let filename = file_path.file_name().unwrap().to_string_lossy();
-        assert!(
-            filename.starts_with("recording_"),
-            "Filename should start with 'recording_'"
-        );
-
-        // File should contain actual audio data (not just empty)
-        let metadata = std::fs::metadata(&file_path).expect("Should get file metadata");
-        assert!(
-            metadata.len() > 44,
-            "WAV file should be larger than header (44 bytes)"
-        ); // WAV header is 44 bytes
-
-        // Verify file timestamp is between before/after recording
-        let file_time = metadata.modified().expect("Should get modified time");
-        assert!(
-            file_time >= before_recording && file_time <= after_recording,
-            "File timestamp should be within recording window"
-        );
-    }
-
-    #[tokio::test]
-    async fn test_debug_record_audio_to_file_creates_unique_filenames() {
-        use tempfile::TempDir;
-
-        // Arrange
-        let temp_dir = TempDir::new().expect("Should create temp dir");
-        let output_dir = temp_dir.path();
-
-        // Act - record two files quickly
-        let file1 = crate::audio::recording::debug_record_audio_to_file(output_dir, 1)
-            .await
-            .expect("Should record first audio file");
-
-        // Small delay to ensure different timestamp
-        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
-
-        let file2 = crate::audio::recording::debug_record_audio_to_file(output_dir, 1)
-            .await
-            .expect("Should record second audio file");
-
-        // Assert
-        assert_ne!(file1, file2, "Should create files with unique names");
-        assert!(file1.exists(), "First file should exist");
-        assert!(file2.exists(), "Second file should exist");
-    }
-
-    #[tokio::test]
-    async fn test_save_audio_samples_to_wav_file() {
-        use tempfile::TempDir;
-
-        // Arrange
-        let temp_dir = TempDir::new().expect("Should create temp dir");
-        let output_path = temp_dir.path().join("test_audio.wav");
-
-        // Create test samples (simple sine wave pattern)
-        let sample_rate = 16_000;
-        let duration_secs = 2;
-        let samples: Vec<i16> = (0..sample_rate * duration_secs)
-            .map(|i| {
-                ((((i as f64) * 2.0 * std::f64::consts::PI * 440.0) / (sample_rate as f64)).sin()
-                    * 16000.0) as i16
-            })
-            .collect();
-
-        // Act
-        crate::audio::files::save_audio_samples_to_wav_file(&samples, &output_path)
-            .await
-            .expect("Should save audio samples to WAV file");
-
-        // Assert
-        assert!(output_path.exists(), "WAV file should be created");
-
-        let metadata = std::fs::metadata(&output_path).expect("Should get file metadata");
-        assert!(metadata.len() > 44, "WAV file should be larger than header");
-
-        // Check WAV header (first 4 bytes should be "RIFF")
-        let file_content = std::fs::read(&output_path).expect("Should read file");
-        assert_eq!(&file_content[0..4], b"RIFF", "Should have RIFF header");
-        assert_eq!(&file_content[8..12], b"WAVE", "Should have WAVE format");
-    }
-
-    #[tokio::test]
-    async fn test_generate_audio_filename_with_timestamp() {
-        use std::time::SystemTime;
-
-        // Act
-        let _before = SystemTime::now();
-        let filename = crate::audio::files::generate_audio_filename_with_timestamp();
-        let _after = SystemTime::now();
-
-        // Assert
-        assert!(
-            filename.starts_with("recording_"),
-            "Should start with 'recording_'"
-        );
-        assert!(filename.ends_with(".wav"), "Should end with '.wav'");
-
-        // Should contain timestamp components (year, month, day, hour, minute, second)
-        assert!(
-            filename.contains("2024") || filename.contains("2025"),
-            "Should contain year"
-        );
-
-        // Generate another filename and ensure they're different
-        let filename2 = crate::audio::files::generate_audio_filename_with_timestamp();
-        if filename == filename2 {
-            // If they're the same, wait a bit and try again
-            tokio::time::sleep(std::time::Duration::from_millis(1001)).await;
-            let filename3 = crate::audio::files::generate_audio_filename_with_timestamp();
-            assert_ne!(filename, filename3, "Filenames should be unique over time");
-        }
-    }
-
-    #[tokio::test]
-    #[ignore = "Requires audio hardware access - run manually with 'cargo test -- --ignored'"]
-    async fn test_debug_real_audio_recording_integration() {
-        use tempfile::TempDir;
-
-        // Arrange
-        let temp_dir = TempDir::new().expect("Should create temp dir");
-        let output_dir = temp_dir.path();
-
-        // Test that we can record real audio and save to file
-        // This would use the actual AudioRecorder from speakr-core
-
-        // Act - This should do a real recording for 1 second
-        let file_path = crate::audio::recording::debug_record_real_audio_to_file(output_dir, 1)
-            .await
-            .expect("Should record real audio to file");
-
-        // Assert
-        assert!(file_path.exists(), "Real audio file should be created");
-
-        let metadata = std::fs::metadata(&file_path).expect("Should get file metadata");
-        // For 1 second of 16kHz mono audio, expect roughly:
-        // 44 bytes (WAV header) + (16000 samples * 2 bytes/sample) = ~32044 bytes
-        assert!(
-            metadata.len() > 1000,
-            "Real audio file should contain substantial data"
-        );
-        assert!(
-            metadata.len() < 100_000,
-            "File size should be reasonable for 1 second"
-        );
-    }
-
-    // TDD: Tests for global backend status service functionality
-    #[tokio::test]
-    async fn test_global_backend_service_initialization() {
-        // Reset global service state for test isolation
-        reset_global_backend_service().await;
-
-        // Test that we can get a global service instance
-        let service = get_global_backend_service().await;
-
-        // Should start with all services in Starting state
-        let status = {
-            let service_guard = service.lock().unwrap();
-            service_guard.get_current_status()
-        };
-        assert!(!status.is_ready());
-        assert_eq!(status.audio_capture, ServiceStatus::Starting);
-        assert_eq!(status.transcription, ServiceStatus::Starting);
-        assert_eq!(status.text_injection, ServiceStatus::Starting);
-
-        // Clean up for next test
-        reset_global_backend_service().await;
-    }
-
-    #[tokio::test]
-    async fn test_global_backend_service_state_updates() {
-        // Reset global service state for test isolation
-        reset_global_backend_service().await;
-
-        // Test that we can update global service state
-        update_global_service_status(ServiceComponent::AudioCapture, ServiceStatus::Ready).await;
-
-        let service = get_global_backend_service().await;
-        let status = {
-            let service_guard = service.lock().unwrap();
-            service_guard.get_current_status()
-        };
-
-        assert_eq!(status.audio_capture, ServiceStatus::Ready);
-        assert_eq!(status.transcription, ServiceStatus::Starting);
-        assert_eq!(status.text_injection, ServiceStatus::Starting);
-
-        // Clean up for next test
-        reset_global_backend_service().await;
-    }
-
-    #[tokio::test]
-    async fn test_global_backend_service_thread_safety() {
-        // Reset global service state for test isolation
-        reset_global_backend_service().await;
-
-        // Test concurrent access from multiple tasks
-        let handles: Vec<_> = (0..10)
-            .map(|i| {
-                tokio::spawn(async move {
-                    let component = match i % 3 {
-                        0 => ServiceComponent::AudioCapture,
-                        1 => ServiceComponent::Transcription,
-                        _ => ServiceComponent::TextInjection,
-                    };
-                    let status = if i % 2 == 0 {
-                        ServiceStatus::Ready
-                    } else {
-                        ServiceStatus::Starting
-                    };
-                    update_global_service_status(component, status).await;
-                })
-            })
-            .collect();
-
-        // Wait for all tasks to complete
-        for handle in handles {
-            handle.await.expect("Task should complete");
-        }
-
-        // Service should still be accessible and consistent
-        let service = get_global_backend_service().await;
-        let status = {
-            let service_guard = service.lock().unwrap();
-            service_guard.get_current_status()
-        };
-
-        // At least one service should have been updated
-        assert!(
-            status.audio_capture == ServiceStatus::Ready
-                || status.transcription == ServiceStatus::Ready
-                || status.text_injection == ServiceStatus::Ready
-        );
-
-        // Clean up for next test
-        reset_global_backend_service().await;
-    }
-
-    #[tokio::test]
-    async fn test_get_backend_status_command_uses_real_service() {
-        // Reset global service state for test isolation
-        reset_global_backend_service().await;
-
-        // Update a service state
-        update_global_service_status(ServiceComponent::AudioCapture, ServiceStatus::Ready).await;
-
-        // Double-check reset worked and we have clean starting state for other services
-        reset_global_backend_service().await;
-        update_global_service_status(ServiceComponent::AudioCapture, ServiceStatus::Ready).await;
-
-        // Call the Tauri command
-        let result = get_backend_status().await.expect("Command should succeed");
-
-        // Should return real service state, not mock data
-        assert_eq!(result.audio_capture, ServiceStatus::Ready);
-        assert_eq!(result.transcription, ServiceStatus::Starting);
-        assert_eq!(result.text_injection, ServiceStatus::Starting);
-    }
-
-    #[tokio::test]
-    async fn test_backend_service_emits_events_on_state_change() {
-        // Reset global service state for test isolation
-        reset_global_backend_service().await;
-
-        // This would test that status changes emit events to frontend
-        // For now, just test that the function exists and doesn't panic
-        let service = get_global_backend_service().await;
-
-        // Mock app handle would be needed for full integration test
-        // For unit test, we just verify the service can track changes
-        let initial_timestamp = {
-            let service_guard = service.lock().unwrap();
-            service_guard.get_current_status().timestamp
-        };
-
-        // Add a small delay to ensure timestamp difference
-        tokio::time::sleep(tokio::time::Duration::from_millis(1)).await;
-
-        update_global_service_status(ServiceComponent::AudioCapture, ServiceStatus::Ready).await;
-
-        let updated_status = {
-            let service_guard = service.lock().unwrap();
-            service_guard.get_current_status()
-        };
-        assert!(
-            updated_status.timestamp > initial_timestamp,
-            "Timestamp should be updated"
-        );
-    }
-
-    #[tokio::test]
-    async fn test_complete_status_communication_flow() {
-        // 🔴 RED: Test the complete flow from service updates to frontend commands
-
-        // Reset global service state for test isolation
-        reset_global_backend_service().await;
-
-        // 1. Initial state - all services should be Starting
-        let initial_status = get_backend_status()
-            .await
-            .expect("Should get initial status");
-        assert!(!initial_status.is_ready(), "Initially should not be ready");
-        assert_eq!(initial_status.audio_capture, ServiceStatus::Starting);
-        assert_eq!(initial_status.transcription, ServiceStatus::Starting);
-        assert_eq!(initial_status.text_injection, ServiceStatus::Starting);
-
-        // 2. Update one service to Ready
-        update_global_service_status(ServiceComponent::AudioCapture, ServiceStatus::Ready).await;
-
-        let partial_ready_status = get_backend_status()
-            .await
-            .expect("Should get updated status");
-        assert!(
-            !partial_ready_status.is_ready(),
-            "Should not be ready with only one service"
-        );
-        assert_eq!(partial_ready_status.audio_capture, ServiceStatus::Ready);
-        assert_eq!(partial_ready_status.transcription, ServiceStatus::Starting);
-        assert_eq!(partial_ready_status.text_injection, ServiceStatus::Starting);
-
-        // 3. Update all services to Ready
-        update_global_service_status(ServiceComponent::Transcription, ServiceStatus::Ready).await;
-        update_global_service_status(ServiceComponent::TextInjection, ServiceStatus::Ready).await;
-
-        let fully_ready_status = get_backend_status()
-            .await
-            .expect("Should get fully ready status");
-        assert!(
-            fully_ready_status.is_ready(),
-            "Should be ready when all services are ready"
-        );
-        assert_eq!(fully_ready_status.audio_capture, ServiceStatus::Ready);
-        assert_eq!(fully_ready_status.transcription, ServiceStatus::Ready);
-        assert_eq!(fully_ready_status.text_injection, ServiceStatus::Ready);
-
-        // 4. Update one service to Error state
-        update_global_service_status(
-            ServiceComponent::Transcription,
-            ServiceStatus::Error("Model failed to load".to_string()),
-        )
-        .await;
-
-        let error_status = get_backend_status().await.expect("Should get error status");
-        assert!(
-            !error_status.is_ready(),
-            "Should not be ready when any service has error"
-        );
-        assert_eq!(error_status.audio_capture, ServiceStatus::Ready);
-        assert!(matches!(
-            error_status.transcription,
-            ServiceStatus::Error(_)
-        ));
-        assert_eq!(error_status.text_injection, ServiceStatus::Ready);
-
-        // 5. Verify timestamps are being updated
-        let initial_timestamp = error_status.timestamp;
-
-        // Small delay to ensure timestamp difference
-        tokio::time::sleep(tokio::time::Duration::from_millis(1)).await;
-
-        // Update transcription service back to Ready
-        update_global_service_status(ServiceComponent::Transcription, ServiceStatus::Ready).await;
-
-        // Ensure all services are Ready (in case other tests affected the global state)
-        update_global_service_status(ServiceComponent::AudioCapture, ServiceStatus::Ready).await;
-        update_global_service_status(ServiceComponent::TextInjection, ServiceStatus::Ready).await;
-
-        let final_status = get_backend_status().await.expect("Should get final status");
-        assert!(
-            final_status.timestamp > initial_timestamp,
-            "Timestamp should be updated on changes"
-        );
-        // After fixing the transcription error and ensuring all services are Ready
-        assert!(
-            final_status.is_ready(),
-            "Should be ready again after fixing error: audio_capture={:?}, transcription={:?}, text_injection={:?}",
-            final_status.audio_capture,
-            final_status.transcription,
-            final_status.text_injection
-        );
-
-        // Clean up: Reset global service state to prevent test interference
-        reset_global_backend_service().await;
-
-        // Ensure cleanup completed
-        let cleanup_status = get_backend_status()
-            .await
-            .expect("Should get cleanup status");
-        assert_eq!(cleanup_status.audio_capture, ServiceStatus::Starting);
-        assert_eq!(cleanup_status.transcription, ServiceStatus::Starting);
-        assert_eq!(cleanup_status.text_injection, ServiceStatus::Starting);
-    }
 }

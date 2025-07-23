@@ -1,9 +1,23 @@
 //! Services module for managing backend service components.
 //!
 //! This module contains service implementations for:
-//! - Global hotkey management
-//! - Backend status tracking
-//! - Service component types
+//! - **Global hotkey management** - Handles system-wide keyboard shortcuts
+//! - **Backend status tracking** - Monitors service component health and readiness
+//! - **Service component types** - Shared enums and types across services
+//!
+//! # Service Architecture
+//!
+//! Services in Speakr follow a singleton pattern with global state management:
+//! 1. Each service has a `*Service` struct for managing state
+//! 2. Services are accessed through `*_internal()` functions
+//! 3. Global state is protected by mutex guards for thread safety
+//! 4. Services emit status updates through the Tauri event system
+//!
+//! # Thread Safety
+//!
+//! All services are designed to be thread-safe and can be accessed from
+//! multiple contexts (frontend events, background tasks, tests) without
+//! data races or corruption.
 
 pub mod hotkey;
 pub mod status;
