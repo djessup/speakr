@@ -34,9 +34,6 @@ pub const DEFAULT_MAX_DURATION_SECS: u32 = 10;
 /// Maximum allowed recording duration in seconds.
 pub const MAX_ALLOWED_DURATION_SECS: u32 = 30;
 
-/// Bit depth for audio samples (16-bit).
-pub const SAMPLE_BIT_DEPTH: u16 = 16;
-
 /// Information about an audio input device.
 #[derive(Debug, Clone, PartialEq)]
 pub struct AudioDevice {
@@ -623,59 +620,4 @@ impl AudioRecorder {
         info!(device_count = devices.len(), "Found input devices");
         Ok(devices)
     }
-}
-
-/// Record audio from the default microphone into a vector of i16 samples.
-///
-/// This is a legacy function maintained for backward compatibility.
-/// New code should use `AudioRecorder` for more control and better error handling.
-///
-/// # Arguments
-///
-/// * `max_duration_secs` – Maximum capture duration in seconds (1-30)
-///
-/// # Returns
-///
-/// A vector of 16-bit audio samples
-///
-/// # Panics
-///
-/// Panics if audio capture fails. Use `AudioRecorder` for proper error handling.
-///
-/// # Examples
-///
-/// ```no_run
-/// use speakr_core::audio::record_to_vec;
-///
-/// let samples = record_to_vec(5); // Record for 5 seconds
-/// println!("Captured {} samples", samples.len());
-/// ```
-#[deprecated(note = "Use AudioRecorder for better error handling and async support")]
-pub fn record_to_vec(max_duration_secs: u32) -> Vec<i16> {
-    // For backward compatibility, use the new implementation
-    let runtime = tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .expect("Failed to create async runtime");
-
-    runtime.block_on(async {
-        let config = RecordingConfig::new(max_duration_secs);
-        let recorder = AudioRecorder::new(config)
-            .await
-            .expect("Failed to create recorder");
-
-        recorder
-            .start_recording()
-            .await
-            .expect("Failed to start recording");
-
-        // Wait for the full duration
-        tokio::time::sleep(Duration::from_secs(max_duration_secs as u64)).await;
-
-        let result = recorder
-            .stop_recording()
-            .await
-            .expect("Failed to stop recording");
-        result.samples()
-    })
 }

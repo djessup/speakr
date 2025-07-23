@@ -10,6 +10,10 @@
 pub mod services;
 pub mod settings;
 
+pub mod audio;
+#[cfg(debug_assertions)]
+pub mod debug;
+
 use services::{
     get_backend_status_internal,
     hotkey::{
@@ -20,6 +24,15 @@ use services::{
 };
 
 use settings::{load_settings_internal, save_settings_internal};
+
+#[cfg(debug_assertions)]
+use debug::{
+    add_debug_log, debug_clear_log_messages_internal, debug_get_log_messages_internal,
+    debug_start_recording_internal, debug_stop_recording_internal,
+    debug_test_audio_recording_internal, DebugLogLevel, DebugLogMessage,
+};
+
+// Audio functions are accessed through full module paths in tests
 
 #[cfg(test)]
 use services::{
@@ -33,95 +46,16 @@ use settings::{
 };
 
 use speakr_types::{AppError, AppSettings, HotkeyConfig, ServiceStatus, StatusUpdate};
-use std::fs;
-use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
+// File system and path utilities are used in specific functions only
 use tauri::AppHandle;
 use tracing::{error, info, warn};
 
 #[cfg(test)]
 use tracing::debug;
 
-// Add import for audio functionality
-use speakr_core::audio::{AudioRecorder, RecordingConfig};
+// Core audio and WAV functionality is now in the audio module
 
-// Add import for WAV file writing
-use hound::{WavSpec, WavWriter};
-
-#[cfg(debug_assertions)]
-use serde::{Deserialize, Serialize};
-
-#[cfg(debug_assertions)]
-use std::collections::VecDeque;
-
-#[cfg(debug_assertions)]
-use std::sync::LazyLock;
-
-// Debug-only log message types and storage
-#[cfg(debug_assertions)]
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum DebugLogLevel {
-    Trace,
-    Debug,
-    Info,
-    Warn,
-    Error,
-}
-
-#[cfg(debug_assertions)]
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DebugLogMessage {
-    pub timestamp: String,
-    pub level: DebugLogLevel,
-    pub target: String,
-    pub message: String,
-}
-
-// Shared state for debug recording session
-#[cfg(debug_assertions)]
-#[derive(Debug)]
-struct DebugRecordingState {
-    recorder: Option<AudioRecorder>,
-    start_time: Option<std::time::Instant>,
-}
-
-#[cfg(debug_assertions)]
-static DEBUG_LOG_MESSAGES: LazyLock<Arc<Mutex<VecDeque<DebugLogMessage>>>> =
-    LazyLock::new(|| Arc::new(Mutex::new(VecDeque::with_capacity(1000))));
-
-#[cfg(debug_assertions)]
-static DEBUG_RECORDING_STATE: LazyLock<Arc<Mutex<DebugRecordingState>>> = LazyLock::new(|| {
-    Arc::new(Mutex::new(DebugRecordingState {
-        recorder: None,
-        start_time: None,
-    }))
-});
-
-#[cfg(debug_assertions)]
-impl DebugLogMessage {
-    pub fn new(level: DebugLogLevel, target: &str, message: &str) -> Self {
-        Self {
-            timestamp: chrono::Utc::now()
-                .format("%Y-%m-%dT%H:%M:%S%.3fZ")
-                .to_string(),
-            level,
-            target: target.to_string(),
-            message: message.to_string(),
-        }
-    }
-}
-
-#[cfg(debug_assertions)]
-pub(crate) fn add_debug_log(level: DebugLogLevel, target: &str, message: &str) {
-    if let Ok(mut logs) = DEBUG_LOG_MESSAGES.lock() {
-        logs.push_back(DebugLogMessage::new(level, target, message));
-
-        // Keep only the last 1000 messages
-        while logs.len() > 1000 {
-            logs.pop_front();
-        }
-    }
-}
+// Debug and audio functionality is now in separate modules
 
 /// Saves application settings to disk atomically.
 ///
@@ -271,51 +205,7 @@ async fn set_auto_launch(enable: bool) -> Result<(), AppError> {
 #[cfg(debug_assertions)]
 #[tauri::command]
 async fn debug_test_audio_recording() -> Result<String, AppError> {
-    use std::time::Duration;
-
-    add_debug_log(
-        DebugLogLevel::Info,
-        "speakr-debug",
-        "Starting audio recording test",
-    );
-
-    // Simulate some processing time
-    tokio::time::sleep(Duration::from_millis(500)).await;
-
-    add_debug_log(
-        DebugLogLevel::Debug,
-        "speakr-core",
-        "Mock audio recording completed",
-    );
-
-    // Return a mock success result
-    Ok("Audio recording test completed successfully! (Mock implementation)".to_string())
-}
-
-/// Gets the default output directory for debug audio recordings.
-///
-/// # Returns
-///
-/// Returns the path to the user's Documents/Speakr/debug_recordings/ directory.
-///
-/// # Errors
-///
-/// Returns `AppError` if the directory cannot be created.
-#[cfg(debug_assertions)]
-pub(crate) fn get_debug_recordings_directory() -> Result<PathBuf, AppError> {
-    let documents_dir = dirs::document_dir()
-        .ok_or_else(|| AppError::Settings("Could not find Documents directory".to_string()))?;
-
-    let debug_dir = documents_dir.join("Speakr").join("debug_recordings");
-
-    // Create directory if it doesn't exist
-    if !debug_dir.exists() {
-        fs::create_dir_all(&debug_dir).map_err(|e| {
-            AppError::FileSystem(format!("Failed to create debug recordings dir: {e}"))
-        })?;
-    }
-
-    Ok(debug_dir)
+    debug_test_audio_recording_internal().await
 }
 
 /// Debug command to start push-to-talk recording with real audio backend.
@@ -333,47 +223,7 @@ pub(crate) fn get_debug_recordings_directory() -> Result<PathBuf, AppError> {
 #[cfg(debug_assertions)]
 #[tauri::command]
 async fn debug_start_recording() -> Result<String, AppError> {
-    info!("🎙️ Debug: Starting real push-to-talk recording");
-    add_debug_log(
-        DebugLogLevel::Info,
-        "speakr-debug",
-        "Real push-to-talk recording started",
-    );
-
-    // Check if already recording
-    {
-        let state = DEBUG_RECORDING_STATE.lock().unwrap();
-        if state.recorder.is_some() {
-            return Ok("Recording already in progress".to_string());
-        }
-    }
-
-    // Create audio recorder with 30 second max duration (push-to-talk should be shorter)
-    let config = RecordingConfig::new(30);
-    let recorder = AudioRecorder::new(config)
-        .await
-        .map_err(|e| AppError::Settings(format!("Failed to create audio recorder: {e}")))?;
-
-    // Start recording
-    recorder
-        .start_recording()
-        .await
-        .map_err(|e| AppError::Settings(format!("Failed to start recording: {e}")))?;
-
-    // Store recorder in global state
-    {
-        let mut state = DEBUG_RECORDING_STATE.lock().unwrap();
-        state.recorder = Some(recorder);
-        state.start_time = Some(std::time::Instant::now());
-    }
-
-    add_debug_log(
-        DebugLogLevel::Info,
-        "speakr-core",
-        "Real audio recording started successfully",
-    );
-
-    Ok("🎙️ Real recording started! Release button to stop and save.".to_string())
+    debug_start_recording_internal().await
 }
 
 /// Debug command to stop push-to-talk recording and save to disk.
@@ -391,62 +241,7 @@ async fn debug_start_recording() -> Result<String, AppError> {
 #[cfg(debug_assertions)]
 #[tauri::command]
 async fn debug_stop_recording() -> Result<String, AppError> {
-    info!("⏹️ Debug: Stopping real push-to-talk recording and saving to disk");
-
-    // Get recorder from global state
-    let (recorder, start_time) = {
-        let mut state = DEBUG_RECORDING_STATE.lock().unwrap();
-        let recorder = state.recorder.take();
-        let start_time = state.start_time.take();
-        (recorder, start_time)
-    };
-
-    let Some(recorder) = recorder else {
-        add_debug_log(
-            DebugLogLevel::Warn,
-            "speakr-debug",
-            "No active recording to stop",
-        );
-        return Ok("No recording was active".to_string());
-    };
-
-    // Stop recording and get samples
-    let result = recorder
-        .stop_recording()
-        .await
-        .map_err(|e| AppError::Settings(format!("Failed to stop recording: {e}")))?;
-
-    let samples = result.samples();
-    let duration = start_time.map(|t| t.elapsed()).unwrap_or_default();
-
-    add_debug_log(
-        DebugLogLevel::Info,
-        "speakr-debug",
-        &format!(
-            "Recording stopped, captured {} samples in {:.2}s",
-            samples.len(),
-            duration.as_secs_f64()
-        ),
-    );
-
-    // Save to file in debug recordings directory
-    let output_dir = get_debug_recordings_directory()?;
-    let filename = generate_audio_filename_with_timestamp();
-    let output_path = output_dir.join(filename);
-
-    save_audio_samples_to_wav_file(&samples, &output_path).await?;
-
-    let success_message = format!(
-        "⏹️ Recording saved! {} samples ({:.2}s) → {}",
-        samples.len(),
-        duration.as_secs_f64(),
-        output_path.display()
-    );
-
-    add_debug_log(DebugLogLevel::Info, "speakr-debug", &success_message);
-
-    info!("{}", success_message);
-    Ok(success_message)
+    debug_stop_recording_internal().await
 }
 
 /// Debug command to get recent log messages.
@@ -464,13 +259,7 @@ async fn debug_stop_recording() -> Result<String, AppError> {
 #[cfg(debug_assertions)]
 #[tauri::command]
 async fn debug_get_log_messages() -> Result<Vec<DebugLogMessage>, AppError> {
-    if let Ok(logs) = DEBUG_LOG_MESSAGES.lock() {
-        Ok(logs.iter().cloned().collect())
-    } else {
-        Err(AppError::Settings(
-            "Failed to access log messages".to_string(),
-        ))
-    }
+    debug_get_log_messages_internal().await
 }
 
 /// Debug command to clear all log messages.
@@ -488,179 +277,13 @@ async fn debug_get_log_messages() -> Result<Vec<DebugLogMessage>, AppError> {
 #[cfg(debug_assertions)]
 #[tauri::command]
 async fn debug_clear_log_messages() -> Result<(), AppError> {
-    if let Ok(mut logs) = DEBUG_LOG_MESSAGES.lock() {
-        logs.clear();
-        add_debug_log(DebugLogLevel::Info, "speakr-debug", "Log messages cleared");
-        Ok(())
-    } else {
-        Err(AppError::Settings(
-            "Failed to clear log messages".to_string(),
-        ))
-    }
+    debug_clear_log_messages_internal().await
 }
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
 fn greet(name: &str) -> String {
     format!("Hello, {name}! You've been greeted from Rust!")
-}
-
-/// Generates a filename with timestamp for audio recordings.
-///
-/// # Returns
-///
-/// A filename string in the format "recording_YYYY-MM-DD_HH-MM-SS.wav"
-/// Generates an audio filename with current timestamp.
-///
-/// # Internal API
-/// This function is only intended for internal use and testing.
-pub fn generate_audio_filename_with_timestamp() -> String {
-    let now = chrono::Utc::now();
-    format!("recording_{}.wav", now.format("%Y-%m-%d_%H-%M-%S%.3f"))
-}
-
-/// Saves audio samples to a WAV file.
-///
-/// # Arguments
-///
-/// * `samples` - The audio samples to save (16-bit mono)
-/// * `output_path` - The path where the WAV file should be saved
-///
-/// # Returns
-///
-/// Returns `Ok(())` on success.
-///
-/// # Errors
-///
-/// Returns `AppError` if the file cannot be written.
-/// Saves audio samples to a WAV file.
-///
-/// # Internal API
-/// This function is only intended for internal use and testing.
-pub async fn save_audio_samples_to_wav_file(
-    samples: &[i16],
-    output_path: &PathBuf,
-) -> Result<(), AppError> {
-    let spec = WavSpec {
-        channels: 1,         // Mono
-        sample_rate: 16_000, // 16 kHz
-        bits_per_sample: 16, // 16-bit
-        sample_format: hound::SampleFormat::Int,
-    };
-
-    let mut writer = WavWriter::create(output_path, spec)
-        .map_err(|e| AppError::FileSystem(format!("Failed to create WAV file: {e}")))?;
-
-    for &sample in samples {
-        writer
-            .write_sample(sample)
-            .map_err(|e| AppError::FileSystem(format!("Failed to write audio sample: {e}")))?;
-    }
-
-    writer
-        .finalize()
-        .map_err(|e| AppError::FileSystem(format!("Failed to finalize WAV file: {e}")))?;
-
-    Ok(())
-}
-
-/// Records audio to file (mock implementation for testing).
-///
-/// # Arguments
-///
-/// * `output_dir` - Directory where the audio file should be saved
-/// * `duration_secs` - Recording duration in seconds
-///
-/// # Returns
-///
-/// Returns the path to the created audio file.
-///
-/// # Errors
-///
-/// Returns `AppError` if recording or file saving fails.
-#[allow(dead_code)] // Used only in tests
-/// Records mock audio data to a file for testing.
-///
-/// # Internal API
-/// This function is only intended for internal use and testing.
-pub async fn debug_record_audio_to_file(
-    output_dir: &Path,
-    duration_secs: u32,
-) -> Result<PathBuf, AppError> {
-    // Generate filename with timestamp
-    let filename = generate_audio_filename_with_timestamp();
-    let output_path = output_dir.join(filename);
-
-    // Create mock audio samples for testing (simple sine wave)
-    let sample_rate = 16_000;
-    let samples: Vec<i16> = (0..sample_rate * duration_secs)
-        .map(|i| {
-            let t = (i as f64) / (sample_rate as f64);
-            let frequency = 440.0; // A note
-            let amplitude = 16000.0;
-            (amplitude * (2.0 * std::f64::consts::PI * frequency * t).sin()) as i16
-        })
-        .collect();
-
-    // Save to WAV file
-    save_audio_samples_to_wav_file(&samples, &output_path).await?;
-
-    Ok(output_path)
-}
-
-/// Records real audio to file using speakr-core AudioRecorder.
-///
-/// # Arguments
-///
-/// * `output_dir` - Directory where the audio file should be saved
-/// * `duration_secs` - Recording duration in seconds
-///
-/// # Returns
-///
-/// Returns the path to the created audio file.
-///
-/// # Errors
-///
-/// Returns `AppError` if recording or file saving fails.
-#[allow(dead_code)] // Used only in tests
-/// Records real audio data to a file for testing.
-///
-/// # Internal API
-/// This function is only intended for internal use and testing.
-pub async fn debug_record_real_audio_to_file(
-    output_dir: &Path,
-    duration_secs: u32,
-) -> Result<PathBuf, AppError> {
-    // Create recorder with the specified duration
-    let config = RecordingConfig::new(duration_secs);
-    let recorder = AudioRecorder::new(config)
-        .await
-        .map_err(|e| AppError::Settings(format!("Failed to create audio recorder: {e}")))?;
-
-    // Start recording
-    recorder
-        .start_recording()
-        .await
-        .map_err(|e| AppError::Settings(format!("Failed to start recording: {e}")))?;
-
-    // Wait for the recording duration
-    tokio::time::sleep(std::time::Duration::from_secs(duration_secs as u64)).await;
-
-    // Stop recording and get samples
-    let result = recorder
-        .stop_recording()
-        .await
-        .map_err(|e| AppError::Settings(format!("Failed to stop recording: {e}")))?;
-
-    let samples = result.samples();
-
-    // Generate filename with timestamp and save to file
-    let filename = generate_audio_filename_with_timestamp();
-    let output_path = output_dir.join(filename);
-
-    save_audio_samples_to_wav_file(&samples, &output_path).await?;
-
-    Ok(output_path)
 }
 
 /// Tauri command to get current backend status
@@ -1228,7 +851,7 @@ mod tests {
         let before_recording = SystemTime::now();
 
         // Act
-        let file_path = debug_record_audio_to_file(output_dir, 2)
+        let file_path = crate::audio::recording::debug_record_audio_to_file(output_dir, 2)
             .await
             .expect("Should record audio to file");
 
@@ -1272,14 +895,14 @@ mod tests {
         let output_dir = temp_dir.path();
 
         // Act - record two files quickly
-        let file1 = debug_record_audio_to_file(output_dir, 1)
+        let file1 = crate::audio::recording::debug_record_audio_to_file(output_dir, 1)
             .await
             .expect("Should record first audio file");
 
         // Small delay to ensure different timestamp
         tokio::time::sleep(std::time::Duration::from_millis(10)).await;
 
-        let file2 = debug_record_audio_to_file(output_dir, 1)
+        let file2 = crate::audio::recording::debug_record_audio_to_file(output_dir, 1)
             .await
             .expect("Should record second audio file");
 
@@ -1308,7 +931,7 @@ mod tests {
             .collect();
 
         // Act
-        save_audio_samples_to_wav_file(&samples, &output_path)
+        crate::audio::files::save_audio_samples_to_wav_file(&samples, &output_path)
             .await
             .expect("Should save audio samples to WAV file");
 
@@ -1330,7 +953,7 @@ mod tests {
 
         // Act
         let _before = SystemTime::now();
-        let filename = generate_audio_filename_with_timestamp();
+        let filename = crate::audio::files::generate_audio_filename_with_timestamp();
         let _after = SystemTime::now();
 
         // Assert
@@ -1347,11 +970,11 @@ mod tests {
         );
 
         // Generate another filename and ensure they're different
-        let filename2 = generate_audio_filename_with_timestamp();
+        let filename2 = crate::audio::files::generate_audio_filename_with_timestamp();
         if filename == filename2 {
             // If they're the same, wait a bit and try again
             tokio::time::sleep(std::time::Duration::from_millis(1001)).await;
-            let filename3 = generate_audio_filename_with_timestamp();
+            let filename3 = crate::audio::files::generate_audio_filename_with_timestamp();
             assert_ne!(filename, filename3, "Filenames should be unique over time");
         }
     }
@@ -1369,7 +992,7 @@ mod tests {
         // This would use the actual AudioRecorder from speakr-core
 
         // Act - This should do a real recording for 1 second
-        let file_path = debug_record_real_audio_to_file(output_dir, 1)
+        let file_path = crate::audio::recording::debug_record_real_audio_to_file(output_dir, 1)
             .await
             .expect("Should record real audio to file");
 

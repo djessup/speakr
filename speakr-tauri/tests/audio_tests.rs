@@ -2,11 +2,11 @@
 
 use tempfile::TempDir;
 
-// Import audio functions from the speakr_lib crate (now pub)
-use speakr_lib::{
-    debug_record_audio_to_file, debug_record_real_audio_to_file,
+// Import audio functions from their new module locations
+use speakr_lib::audio::files::{
     generate_audio_filename_with_timestamp, save_audio_samples_to_wav_file,
 };
+use speakr_lib::audio::recording::{debug_record_audio_to_file, debug_record_real_audio_to_file};
 
 #[tokio::test]
 async fn test_debug_record_audio_to_file_saves_with_timestamp() {
