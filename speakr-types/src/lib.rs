@@ -1,70 +1,172 @@
-//! Shared data types for the Speakr application.
+// ============================================================================
+//! Shared types and data structures for the Speakr application.
 //!
-//! This crate contains all the common data structures used across
-//! the Speakr frontend (speakr-ui) and backend (speakr-tauri) to
-//! ensure consistency and avoid duplication.
+//! This crate provides the unified type system used across all Speakr components:
+//! - Frontend (speakr-ui) and backend (speakr-tauri) consistency
+//! - Settings management and persistence structures
+//! - Error handling and status reporting types
+//! - Model configuration and metadata definitions
+//!
+//! # Usage
+//!
+//! All shared types implement `Serialize` and `Deserialize` for seamless
+//! communication between frontend and backend components.
+//!
+//! ```no_run
+//! use speakr_types::{AppSettings, AppError, BackendStatus};
+//!
+//! let settings = AppSettings::default();
+//! let status = BackendStatus::new_ready();
+//! ```
+// ============================================================================
 
+// =========================
+// External Imports
+// =========================
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-/// Default schema version for settings
+// ============================================================================
+// Constants and Configuration Defaults
+// ============================================================================
+
+/// Default schema version for settings migration support.
+///
+/// Used to handle backwards compatibility when settings format changes.
 pub const DEFAULT_SCHEMA_VERSION: u32 = 1;
 
-/// Default global hotkey combination
-/// Using F1 to avoid conflicts with macOS system shortcuts
-/// Backtick conflicts with system shortcuts on macOS
+/// Default global hotkey combination for dictation activation.
+///
+/// Uses F1 key to avoid conflicts with macOS system shortcuts.
+/// Backtick (`) conflicts with system shortcuts on macOS.
 pub const DEFAULT_HOTKEY: &str = "CmdOrCtrl+Alt+F1";
 
-/// Default Whisper model size
+/// Default Whisper model size for transcription.
+///
+/// Medium provides balanced accuracy and performance for most use cases.
 pub const DEFAULT_MODEL_SIZE: &str = "medium";
 
-/// Default auto-launch setting
+/// Default auto-launch setting for system startup.
+///
+/// Disabled by default to respect user privacy preferences.
 pub const DEFAULT_AUTO_LAUNCH: bool = false;
 
+// ============================================================================
+// Error Types and Error Handling
+// ============================================================================
+
+// --------------------------------------------------------------------------
 /// Unified error type for all Tauri backend operations.
-/// This matches the error variants expected by the frontend.
+///
+/// This provides consistent error handling across the entire application,
+/// ensuring the frontend can handle all error scenarios uniformly.
+///
+/// # Error Categories
+///
+/// - `Settings`: Configuration and persistence errors
+/// - `FileSystem`: File I/O and permission errors
+/// - `HotKey`: Global hotkey registration and validation errors
+/// - `Command`: General Tauri command execution errors
+///
+/// # Examples
+///
+/// ```no_run
+/// use speakr_types::AppError;
+///
+/// let error = AppError::Settings("Invalid hotkey format".to_string());
+/// assert_eq!(error.to_string(), "Settings error: Invalid hotkey format");
+/// ```
 #[derive(Error, Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum AppError {
-    /// Settings-related errors
+    /// Settings-related errors including validation and persistence failures.
     #[error("Settings error: {0}")]
     Settings(String),
 
-    /// File system operation errors
+    /// File system operation errors including I/O and permissions.
     #[error("File system error: {0}")]
     FileSystem(String),
 
-    /// Hot-key registration or validation failed
+    /// Hot-key registration or validation failures.
     #[error("Hot-key error: {0}")]
     HotKey(String),
 
-    /// Hot-key conflict detected
+    /// Hot-key conflict with existing system or application shortcuts.
     #[error("Hot-key conflict: {0}")]
     HotKeyConflict(String),
 
-    /// Hot-key not found
+    /// Hot-key not found during unregistration attempts.
     #[error("Hot-key not found: {0}")]
     HotKeyNotFound(String),
 
-    /// General command error
+    /// General command execution errors from Tauri commands.
     #[error("Command error: {0}")]
     Command(String),
 }
 
-/// Global hotkey registration errors
+// --------------------------------------------------------------------------
+/// Specific error type for global hotkey operations.
+///
+/// Provides detailed error information for hotkey-related failures,
+/// enabling appropriate user feedback and recovery strategies.
+///
+/// # Error Scenarios
+///
+/// - Registration failures due to system limitations
+/// - Conflicts with existing shortcuts
+/// - Hotkey not found during operations
+///
+/// # Examples
+///
+/// ```no_run
+/// use speakr_types::HotkeyError;
+///
+/// let error = HotkeyError::ConflictDetected("Cmd+Space already in use".to_string());
+/// ```
 #[derive(Error, Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum HotkeyError {
+    /// Failed to register the hotkey with the system.
     #[error("Failed to register global hot-key: {0}")]
     RegistrationFailed(String),
+
+    /// Hotkey conflicts with existing system or application shortcuts.
     #[error("Hot-key conflict detected: {0}")]
     ConflictDetected(String),
+
+    /// Hotkey not found in the registry during operations.
     #[error("Hot-key not found: {0}")]
     NotFound(String),
 }
 
-/// Configuration for global hot-key settings
+// ============================================================================
+// Configuration and Settings Types
+// ============================================================================
+
+// --------------------------------------------------------------------------
+/// Configuration for global hot-key settings and behaviour.
+///
+/// Encapsulates both the hotkey combination and its enabled state,
+/// allowing fine-grained control over hotkey functionality.
+///
+/// # Fields
+///
+/// - `shortcut`: Tauri-format hotkey string (e.g., "CmdOrCtrl+Alt+F1")
+/// - `enabled`: Whether the hotkey is active
+///
+/// # Examples
+///
+/// ```no_run
+/// use speakr_types::HotkeyConfig;
+///
+/// let config = HotkeyConfig {
+///     shortcut: "CmdOrCtrl+Shift+Space".to_string(),
+///     enabled: true,
+/// };
+/// ```
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct HotkeyConfig {
+    /// The hotkey combination string in Tauri format.
     pub shortcut: String,
+    /// Whether the hotkey is currently enabled.
     pub enabled: bool,
 }
 
@@ -77,21 +179,53 @@ impl Default for HotkeyConfig {
     }
 }
 
+// --------------------------------------------------------------------------
 /// Unified application settings - the single source of truth.
-/// This ensures consistency between frontend and backend representations.
+///
+/// This structure ensures consistency between frontend and backend
+/// representations of user preferences and configuration.
+///
+/// # Schema Evolution
+///
+/// The `version` field supports settings migration when the format changes.
+/// Increment `DEFAULT_SCHEMA_VERSION` when making breaking changes.
+///
+/// # Fields
+///
+/// - `version`: Schema version for migration support
+/// - `hot_key`: Global hotkey combination string
+/// - `model_size`: Selected Whisper model size identifier
+/// - `auto_launch`: Whether to start with system
+///
+/// # Examples
+///
+/// ```no_run
+/// use speakr_types::AppSettings;
+///
+/// let settings = AppSettings {
+///     version: 1,
+///     hot_key: "CmdOrCtrl+Alt+F1".to_string(),
+///     model_size: "medium".to_string(),
+///     auto_launch: false,
+/// };
+/// ```
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AppSettings {
-    /// Schema version for migration support
+    /// Schema version for migration support.
     #[serde(default = "default_schema_version")]
     pub version: u32,
-    /// Global hot-key combination in Tauri format (e.g., "CmdOrCtrl+Alt+`")
+
+    /// Global hot-key combination in Tauri format (e.g., "CmdOrCtrl+Alt+F1").
     pub hot_key: String,
-    /// Selected model size ("small", "medium", "large")
+
+    /// Selected model size identifier ("small", "medium", "large").
     pub model_size: String,
-    /// Whether to auto-launch the app on system startup
+
+    /// Whether to auto-launch the app on system startup.
     pub auto_launch: bool,
 }
 
+/// Provides the default schema version for serde deserialization.
 fn default_schema_version() -> u32 {
     DEFAULT_SCHEMA_VERSION
 }
@@ -107,16 +241,59 @@ impl Default for AppSettings {
     }
 }
 
-/// Available Whisper model sizes for transcription
+// ============================================================================
+// Model Configuration and Metadata
+// ============================================================================
+
+// --------------------------------------------------------------------------
+/// Available Whisper model sizes for transcription quality and performance.
+///
+/// Each model size represents a different balance between accuracy, speed,
+/// and resource consumption. Larger models provide better accuracy but
+/// require more memory and processing time.
+///
+/// # Model Characteristics
+///
+/// - `Small`: Fast processing, good for quick notes (39MB)
+/// - `Medium`: Balanced accuracy and speed (769MB)
+/// - `Large`: Highest accuracy, best for professional use (1550MB)
+///
+/// # Examples
+///
+/// ```no_run
+/// use speakr_types::ModelSize;
+///
+/// let size = ModelSize::Medium;
+/// assert_eq!(size.display_name(), "Medium (769MB, balanced)");
+/// assert_eq!(size.to_string_value(), "medium");
+/// ```
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub enum ModelSize {
+    /// Small model: 39MB, optimised for speed.
     Small,
+
+    /// Medium model: 769MB, balanced performance (default).
     #[default]
     Medium,
+
+    /// Large model: 1550MB, maximum accuracy.
     Large,
 }
 
 impl ModelSize {
+    /// Returns the user-friendly display name with size and characteristics.
+    ///
+    /// # Returns
+    ///
+    /// A static string describing the model's characteristics.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use speakr_types::ModelSize;
+    ///
+    /// assert_eq!(ModelSize::Small.display_name(), "Small (39MB, fast)");
+    /// ```
     pub fn display_name(&self) -> &'static str {
         match self {
             ModelSize::Small => "Small (39MB, fast)",
@@ -125,6 +302,19 @@ impl ModelSize {
         }
     }
 
+    /// Returns the string identifier used for settings storage.
+    ///
+    /// # Returns
+    ///
+    /// A static string suitable for serialisation and storage.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use speakr_types::ModelSize;
+    ///
+    /// assert_eq!(ModelSize::Medium.to_string_value(), "medium");
+    /// ```
     pub fn to_string_value(&self) -> &'static str {
         match self {
             ModelSize::Small => "small",
@@ -133,33 +323,108 @@ impl ModelSize {
         }
     }
 
+    /// Creates a ModelSize from a string identifier.
+    ///
+    /// # Arguments
+    ///
+    /// * `s` - The string identifier ("small", "medium", "large")
+    ///
+    /// # Returns
+    ///
+    /// The corresponding ModelSize variant, defaulting to Medium for unknown values.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use speakr_types::ModelSize;
+    ///
+    /// assert_eq!(ModelSize::from_string("small"), ModelSize::Small);
+    /// assert_eq!(ModelSize::from_string("unknown"), ModelSize::Medium);
+    /// ```
     pub fn from_string(s: &str) -> Self {
         match s {
             "small" => ModelSize::Small,
             "medium" => ModelSize::Medium,
             "large" => ModelSize::Large,
-            _ => ModelSize::Medium, // Default fallback
+            _ => ModelSize::Medium, // Default fallback for unknown values
         }
     }
 
-    /// Returns all available model sizes
+    /// Returns all available model sizes for UI enumeration.
+    ///
+    /// # Returns
+    ///
+    /// A vector containing all ModelSize variants in order.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use speakr_types::ModelSize;
+    ///
+    /// let sizes = ModelSize::all();
+    /// assert_eq!(sizes.len(), 3);
+    /// ```
     pub fn all() -> Vec<ModelSize> {
         vec![ModelSize::Small, ModelSize::Medium, ModelSize::Large]
     }
 }
 
-/// Model file information
+// --------------------------------------------------------------------------
+/// Comprehensive information about a specific Whisper model file.
+///
+/// Contains all metadata needed for model download, storage, and
+/// user interface display including file characteristics and descriptions.
+///
+/// # Fields
+///
+/// - `size`: The ModelSize variant
+/// - `filename`: Expected filename for the model file
+/// - `display_name`: User-friendly name with characteristics
+/// - `file_size_mb`: Approximate file size in megabytes
+/// - `description`: Detailed usage recommendations
+///
+/// # Examples
+///
+/// ```no_run
+/// use speakr_types::{ModelInfo, ModelSize};
+///
+/// let info = ModelInfo::for_size(ModelSize::Medium);
+/// assert_eq!(info.filename, "ggml-medium.bin");
+/// assert_eq!(info.file_size_mb, 769);
+/// ```
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ModelInfo {
+    /// The model size variant.
     pub size: ModelSize,
+    /// Expected filename for the model file.
     pub filename: String,
+    /// User-friendly display name with characteristics.
     pub display_name: String,
+    /// Approximate file size in megabytes.
     pub file_size_mb: u32,
+    /// Detailed description of model characteristics and use cases.
     pub description: &'static str,
 }
 
 impl ModelInfo {
-    /// Get model information for a given size
+    /// Creates ModelInfo for a specific model size.
+    ///
+    /// # Arguments
+    ///
+    /// * `size` - The ModelSize to create information for
+    ///
+    /// # Returns
+    ///
+    /// Complete ModelInfo with all metadata populated.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use speakr_types::{ModelInfo, ModelSize};
+    ///
+    /// let info = ModelInfo::for_size(ModelSize::Small);
+    /// assert_eq!(info.description, "Fast processing, good for quick notes");
+    /// ```
     pub fn for_size(size: ModelSize) -> Self {
         match size {
             ModelSize::Small => ModelInfo {
@@ -187,12 +452,44 @@ impl ModelInfo {
     }
 }
 
-/// Status of an individual service component in the backend
+// ============================================================================
+// Status and Service Management
+// ============================================================================
+
+// --------------------------------------------------------------------------
+/// Status of an individual service component in the backend.
+///
+/// Provides detailed status information for each service, enabling
+/// the frontend to display appropriate UI states and error messages.
+///
+/// # Status Values
+///
+/// - `Ready`: Service is operational and available
+/// - `Starting`: Service is initialising
+/// - `Error(String)`: Service failed with specific error details
+/// - `Unavailable`: Service is not available (e.g., permissions)
+///
+/// # Examples
+///
+/// ```no_run
+/// use speakr_types::ServiceStatus;
+///
+/// let status = ServiceStatus::Ready;
+/// assert!(status.is_ready());
+/// assert_eq!(status.display_name(), "Ready");
+///
+/// let error_status = ServiceStatus::Error("Permission denied".to_string());
+/// assert!(!error_status.is_ready());
+/// ```
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum ServiceStatus {
+    /// Service is ready and operational.
     Ready,
+    /// Service is currently starting up.
     Starting,
+    /// Service encountered an error with details.
     Error(String),
+    /// Service is unavailable (e.g., missing permissions).
     Unavailable,
 }
 
@@ -203,7 +500,20 @@ impl Default for ServiceStatus {
 }
 
 impl ServiceStatus {
-    /// Returns the display name for the status
+    /// Returns the user-friendly display name for the status.
+    ///
+    /// # Returns
+    ///
+    /// A static string representing the status for UI display.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use speakr_types::ServiceStatus;
+    ///
+    /// assert_eq!(ServiceStatus::Ready.display_name(), "Ready");
+    /// assert_eq!(ServiceStatus::Error("test".to_string()).display_name(), "Error");
+    /// ```
     pub fn display_name(&self) -> &str {
         match self {
             ServiceStatus::Ready => "Ready",
@@ -213,30 +523,102 @@ impl ServiceStatus {
         }
     }
 
-    /// Returns true if the service is ready
+    /// Returns true if the service is ready for operation.
+    ///
+    /// # Returns
+    ///
+    /// Boolean indicating operational readiness.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use speakr_types::ServiceStatus;
+    ///
+    /// assert!(ServiceStatus::Ready.is_ready());
+    /// assert!(!ServiceStatus::Starting.is_ready());
+    /// ```
     pub fn is_ready(&self) -> bool {
         matches!(self, ServiceStatus::Ready)
     }
 }
 
-/// Overall backend system status
+// --------------------------------------------------------------------------
+/// Overall backend system status combining all service states.
+///
+/// Provides a comprehensive view of system health, enabling the frontend
+/// to determine overall application readiness and display appropriate
+/// status indicators to users.
+///
+/// # Service Components
+///
+/// - `audio_capture`: Microphone access and recording capability
+/// - `transcription`: Whisper model loading and processing
+/// - `text_injection`: Keyboard simulation and text insertion
+/// - `timestamp`: Unix timestamp in milliseconds for status age
+///
+/// # Examples
+///
+/// ```no_run
+/// use speakr_types::{BackendStatus, ServiceStatus};
+///
+/// let status = BackendStatus::new_ready();
+/// assert!(status.is_ready());
+///
+/// let partial_status = BackendStatus {
+///     audio_capture: ServiceStatus::Ready,
+///     transcription: ServiceStatus::Starting,
+///     text_injection: ServiceStatus::Ready,
+///     timestamp: 12345,
+/// };
+/// assert!(!partial_status.is_ready());
+/// ```
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BackendStatus {
+    /// Status of audio capture service (microphone access).
     pub audio_capture: ServiceStatus,
+    /// Status of transcription service (Whisper model).
     pub transcription: ServiceStatus,
+    /// Status of text injection service (keyboard simulation).
     pub text_injection: ServiceStatus,
+    /// Unix timestamp in milliseconds when status was created.
     pub timestamp: u64,
 }
 
 impl BackendStatus {
-    /// Returns true if all services are ready
+    /// Returns true if all services are ready for operation.
+    ///
+    /// # Returns
+    ///
+    /// Boolean indicating if the entire system is operational.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use speakr_types::BackendStatus;
+    ///
+    /// let ready_status = BackendStatus::new_ready();
+    /// assert!(ready_status.is_ready());
+    /// ```
     pub fn is_ready(&self) -> bool {
         self.audio_capture.is_ready()
             && self.transcription.is_ready()
             && self.text_injection.is_ready()
     }
 
-    /// Creates a new status with all services starting
+    /// Creates a new status with all services in starting state.
+    ///
+    /// # Returns
+    ///
+    /// BackendStatus with all services marked as Starting.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use speakr_types::BackendStatus;
+    ///
+    /// let status = BackendStatus::new_starting();
+    /// assert!(!status.is_ready());
+    /// ```
     pub fn new_starting() -> Self {
         Self {
             audio_capture: ServiceStatus::Starting,
@@ -246,7 +628,20 @@ impl BackendStatus {
         }
     }
 
-    /// Creates a new status with all services ready
+    /// Creates a new status with all services ready.
+    ///
+    /// # Returns
+    ///
+    /// BackendStatus with all services marked as Ready.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use speakr_types::BackendStatus;
+    ///
+    /// let status = BackendStatus::new_ready();
+    /// assert!(status.is_ready());
+    /// ```
     pub fn new_ready() -> Self {
         Self {
             audio_capture: ServiceStatus::Ready,
@@ -257,12 +652,27 @@ impl BackendStatus {
     }
 }
 
-/// Type alias for status updates sent to frontend
+// =========================
+// Type Aliases and Exports
+// =========================
+
+/// Type alias for status updates sent to the frontend.
+///
+/// Provides semantic clarity when used specifically for status broadcasting
+/// while maintaining the same underlying structure as BackendStatus.
 pub type StatusUpdate = BackendStatus;
+
+// ============================================================================
+// Unit Tests
+// ============================================================================
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // =========================
+    // Settings and Configuration Tests
+    // =========================
 
     #[test]
     fn test_app_settings_default() {
@@ -281,6 +691,18 @@ mod tests {
     }
 
     #[test]
+    fn test_settings_serialization() {
+        let settings = AppSettings::default();
+        let json = serde_json::to_string(&settings).unwrap();
+        let deserialized: AppSettings = serde_json::from_str(&json).unwrap();
+        assert_eq!(settings, deserialized);
+    }
+
+    // =========================
+    // Model Configuration Tests
+    // =========================
+
+    #[test]
     fn test_model_size_conversions() {
         let medium = ModelSize::Medium;
         assert_eq!(medium.to_string_value(), "medium");
@@ -291,21 +713,33 @@ mod tests {
     }
 
     #[test]
+    fn test_model_size_from_string_fallback() {
+        let unknown = ModelSize::from_string("unknown_size");
+        assert_eq!(unknown, ModelSize::Medium);
+    }
+
+    #[test]
+    fn test_model_size_all() {
+        let all_sizes = ModelSize::all();
+        assert_eq!(all_sizes.len(), 3);
+        assert!(all_sizes.contains(&ModelSize::Small));
+        assert!(all_sizes.contains(&ModelSize::Medium));
+        assert!(all_sizes.contains(&ModelSize::Large));
+    }
+
+    #[test]
     fn test_model_info() {
         let info = ModelInfo::for_size(ModelSize::Small);
         assert_eq!(info.filename, "ggml-small.bin");
         assert_eq!(info.file_size_mb, 39);
+        assert_eq!(info.size, ModelSize::Small);
+        assert_eq!(info.description, "Fast processing, good for quick notes");
     }
 
-    #[test]
-    fn test_settings_serialization() {
-        let settings = AppSettings::default();
-        let json = serde_json::to_string(&settings).unwrap();
-        let deserialized: AppSettings = serde_json::from_str(&json).unwrap();
-        assert_eq!(settings, deserialized);
-    }
+    // =========================
+    // Service Status Tests
+    // =========================
 
-    // 🔴 RED: Tests for status indicator functionality
     #[test]
     fn test_service_status_default() {
         let status = ServiceStatus::default();
@@ -322,6 +756,18 @@ mod tests {
         );
         assert_eq!(ServiceStatus::Unavailable.display_name(), "Unavailable");
     }
+
+    #[test]
+    fn test_service_status_is_ready() {
+        assert!(ServiceStatus::Ready.is_ready());
+        assert!(!ServiceStatus::Starting.is_ready());
+        assert!(!ServiceStatus::Error("error".to_string()).is_ready());
+        assert!(!ServiceStatus::Unavailable.is_ready());
+    }
+
+    // =========================
+    // Backend Status Tests
+    // =========================
 
     #[test]
     fn test_backend_status_ready_when_all_services_ready() {
@@ -383,3 +829,5 @@ mod tests {
         assert!(!update_starting.is_ready());
     }
 }
+
+// ===========================================================================

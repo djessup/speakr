@@ -71,7 +71,7 @@ large comment signposts to help navigate the file easily.
 
 ### speakr-types/src/
 
-- [ ] `lib.rs`
+- [x] `lib.rs` ✅ **COMPLETED**
 
 ### speakr-ui/src/
 
