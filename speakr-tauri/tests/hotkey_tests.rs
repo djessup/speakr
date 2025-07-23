@@ -3,7 +3,7 @@
 // No unused imports
 
 // Import functions from the speakr_lib crate (now pub)
-use speakr_lib::validate_hot_key_internal;
+use speakr_lib::services::hotkey::validate_hot_key_internal;
 
 #[tokio::test]
 async fn test_validate_hot_key_success() {

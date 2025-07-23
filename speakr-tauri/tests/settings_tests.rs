@@ -4,7 +4,7 @@ use speakr_types::AppSettings;
 use tracing::debug;
 
 // Import functions from the speakr_lib crate (now pub(crate))
-use speakr_lib::{
+use speakr_lib::settings::{
     load_settings_from_dir, migrate_settings, save_settings_to_dir, try_load_settings_file,
     validate_settings_directory_permissions,
 };

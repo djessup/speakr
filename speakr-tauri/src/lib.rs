@@ -7,15 +7,40 @@
 //! - Model file validation
 //! - System integration
 
-use speakr_types::{
-    AppError, AppSettings, BackendStatus, HotkeyConfig, HotkeyError, ServiceStatus, StatusUpdate,
+pub mod services;
+pub mod settings;
+
+use services::{
+    get_backend_status_internal,
+    hotkey::{
+        register_global_hotkey_internal, unregister_global_hotkey_internal,
+        validate_hot_key_internal,
+    },
+    update_service_status_internal, ServiceComponent,
 };
+
+use settings::{load_settings_internal, save_settings_internal};
+
+#[cfg(test)]
+use services::{
+    get_global_backend_service, reset_global_backend_service, update_global_service_status,
+    BackendStatusService,
+};
+#[cfg(test)]
+use settings::{
+    get_settings_backup_path, get_settings_path, load_settings_from_dir, migrate_settings,
+    save_settings_to_dir, try_load_settings_file, validate_settings_directory_permissions,
+};
+
+use speakr_types::{AppError, AppSettings, HotkeyConfig, ServiceStatus, StatusUpdate};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
-use tauri::{AppHandle, Emitter};
-use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
-use tracing::{debug, error, info, warn};
+use tauri::AppHandle;
+use tracing::{error, info, warn};
+
+#[cfg(test)]
+use tracing::debug;
 
 // Add import for audio functionality
 use speakr_core::audio::{AudioRecorder, RecordingConfig};
@@ -72,10 +97,6 @@ static DEBUG_RECORDING_STATE: LazyLock<Arc<Mutex<DebugRecordingState>>> = LazyLo
     }))
 });
 
-// Global backend status service instance
-static GLOBAL_BACKEND_SERVICE: LazyLock<Arc<Mutex<BackendStatusService>>> =
-    LazyLock::new(|| Arc::new(Mutex::new(BackendStatusService::new())));
-
 #[cfg(debug_assertions)]
 impl DebugLogMessage {
     pub fn new(level: DebugLogLevel, target: &str, message: &str) -> Self {
@@ -102,78 +123,6 @@ pub(crate) fn add_debug_log(level: DebugLogLevel, target: &str, message: &str) {
     }
 }
 
-// All types are now centralized in speakr-types crate
-
-/// Gets the settings file path in the app data directory.
-/// Gets the settings file path in the app data directory.
-///
-/// # Internal API
-/// This function is only intended for internal use and testing.
-pub(crate) fn get_settings_path() -> Result<PathBuf, AppError> {
-    let app_data = dirs::config_dir()
-        .ok_or_else(|| AppError::Settings("Could not find config directory".to_string()))?;
-
-    let speakr_dir = app_data.join("speakr");
-    if !speakr_dir.exists() {
-        fs::create_dir_all(&speakr_dir)
-            .map_err(|e| AppError::FileSystem(format!("Failed to create config dir: {e}")))?;
-    }
-
-    // Validate directory permissions after creation
-    validate_settings_directory_permissions(&speakr_dir)?;
-
-    Ok(speakr_dir.join("settings.json"))
-}
-
-/// Gets the backup settings file path for corruption recovery.
-#[allow(dead_code)] // Used in tests
-/// Gets the backup settings file path for corruption recovery.
-///
-/// # Internal API
-/// This function is only intended for internal use and testing.
-pub(crate) fn get_settings_backup_path() -> Result<PathBuf, AppError> {
-    let settings_path = get_settings_path()?;
-    Ok(settings_path.with_extension("json.backup"))
-}
-
-/// Migrates settings from older versions to the current schema.
-///
-/// # Arguments
-///
-/// * `settings` - The settings loaded from disk
-///
-/// # Returns
-///
-/// Returns the migrated settings with updated version number.
-/// Migrates settings from older versions to the current version.
-///
-/// # Internal API
-/// This function is only intended for internal use and testing.
-pub fn migrate_settings(mut settings: AppSettings) -> AppSettings {
-    match settings.version {
-        0 => {
-            // Migrate from version 0 to 1 - no changes needed for now
-            settings.version = 1;
-        }
-        1 => {
-            // Current version - no migration needed
-        }
-        v if v > 1 => {
-            // Future version - log warning but don't modify
-            warn!("Warning: Settings file has newer version {v} than supported (1). Using as-is.");
-        }
-        _ => {
-            // Invalid version - reset to defaults
-            warn!(
-                "Warning: Invalid settings version {}. Resetting to defaults.",
-                settings.version
-            );
-            settings = AppSettings::default();
-        }
-    }
-    settings
-}
-
 /// Saves application settings to disk atomically.
 ///
 /// # Arguments
@@ -189,14 +138,7 @@ pub fn migrate_settings(mut settings: AppSettings) -> AppSettings {
 /// Returns `AppError` if the settings cannot be saved.
 #[tauri::command]
 async fn save_settings(settings: AppSettings) -> Result<(), AppError> {
-    // Use the global settings directory for production
-    let settings_path = get_settings_path()?;
-    let settings_dir = settings_path
-        .parent()
-        .ok_or_else(|| AppError::Settings("Invalid settings path".to_string()))?
-        .to_path_buf();
-
-    save_settings_to_dir(&settings, &settings_dir).await
+    save_settings_internal(settings).await
 }
 
 /// Loads application settings from disk with corruption recovery.
@@ -211,242 +153,7 @@ async fn save_settings(settings: AppSettings) -> Result<(), AppError> {
 /// Returns `AppError` if all recovery attempts fail.
 #[tauri::command]
 async fn load_settings() -> Result<AppSettings, AppError> {
-    // Use the global settings directory for production
-    let settings_path = get_settings_path()?;
-    let settings_dir = settings_path
-        .parent()
-        .ok_or_else(|| AppError::Settings("Invalid settings path".to_string()))?
-        .to_path_buf();
-
-    load_settings_from_dir(&settings_dir).await
-}
-
-/// Helper function to load settings from a specific file path.
-///
-/// # Arguments
-///
-/// * `path` - The path to the settings file
-///
-/// # Returns
-///
-/// Returns the loaded settings on success.
-///
-/// # Errors
-///
-/// Returns error if the file cannot be read or parsed.
-/// Attempts to load settings from a specific file path.
-///
-/// # Internal API
-/// This function is only intended for internal use and testing.
-pub fn try_load_settings_file(path: &PathBuf) -> Result<AppSettings, String> {
-    let content =
-        fs::read_to_string(path).map_err(|e| format!("Failed to read settings file: {e}"))?;
-
-    let settings: AppSettings = serde_json::from_str(&content)
-        .map_err(|e| format!("Failed to parse settings JSON: {e}"))?;
-
-    Ok(settings)
-}
-
-/// Service responsible for managing global hot-keys
-pub struct GlobalHotkeyService {
-    app_handle: AppHandle,
-    current_shortcut: Arc<Mutex<Option<String>>>,
-    current_shortcut_instance: Arc<Mutex<Option<Shortcut>>>,
-}
-
-impl GlobalHotkeyService {
-    /// Creates a new GlobalHotkeyService instance
-    ///
-    /// # Arguments
-    ///
-    /// * `app_handle` - The Tauri application handle for registering shortcuts
-    ///
-    /// # Errors
-    ///
-    /// Returns `HotkeyError` if service initialization fails
-    pub fn new(app_handle: AppHandle) -> Result<Self, HotkeyError> {
-        Ok(Self {
-            app_handle,
-            current_shortcut: Arc::new(Mutex::new(None)),
-            current_shortcut_instance: Arc::new(Mutex::new(None)),
-        })
-    }
-
-    /// Registers a global hot-key with the system
-    ///
-    /// # Arguments
-    ///
-    /// * `config` - The hot-key configuration to register
-    ///
-    /// # Errors
-    ///
-    /// Returns `HotkeyError::RegistrationFailed` if registration fails
-    /// Returns `HotkeyError::ConflictDetected` if the hot-key is already in use
-    pub async fn register_hotkey(&mut self, config: &HotkeyConfig) -> Result<(), HotkeyError> {
-        // If hotkey is disabled, succeed but don't actually register
-        if !config.enabled {
-            return Ok(());
-        }
-
-        // 🟢 GREEN: Use Tauri's native shortcut parsing instead of custom implementation
-        let shortcut = config.shortcut.parse::<Shortcut>().map_err(|e| {
-            HotkeyError::RegistrationFailed(format!("Invalid shortcut format: {e}"))
-        })?;
-
-        // Unregister existing shortcut if any
-        if let Ok(mut current_instance) = self.current_shortcut_instance.lock() {
-            if let Some(existing_shortcut) = current_instance.take() {
-                let _ = self
-                    .app_handle
-                    .global_shortcut()
-                    .unregister(existing_shortcut);
-            }
-        }
-
-        // Register the new shortcut with the system
-        let app_handle_clone = self.app_handle.clone();
-        self.app_handle
-            .global_shortcut()
-            .on_shortcut(shortcut, move |_app, _shortcut, _event| {
-                // Emit an event when the hotkey is triggered
-                let _ = app_handle_clone.emit("hotkey-triggered", ());
-
-                // TODO: Wire this to speakr-core pipeline in next step
-                debug!("Global hotkey triggered");
-            })
-            .map_err(|e| {
-                HotkeyError::ConflictDetected(format!("Failed to register shortcut: {e}"))
-            })?;
-
-        // Register the shortcut for system-wide listening
-        self.app_handle
-            .global_shortcut()
-            .register(shortcut)
-            .map_err(|e| {
-                HotkeyError::ConflictDetected(format!(
-                    "Failed to register shortcut with system (conflict?): {e}"
-                ))
-            })?;
-
-        // Update internal state
-        if let Ok(mut current) = self.current_shortcut.lock() {
-            *current = Some(config.shortcut.clone());
-        }
-
-        if let Ok(mut current_instance) = self.current_shortcut_instance.lock() {
-            *current_instance = Some(shortcut);
-        }
-
-        info!("Successfully registered global hotkey: {}", config.shortcut);
-        Ok(())
-    }
-
-    /// Unregisters the currently registered hot-key
-    ///
-    /// # Errors
-    ///
-    /// Returns `HotkeyError::NotFound` if no hot-key is currently registered
-    pub async fn unregister_hotkey(&mut self) -> Result<(), HotkeyError> {
-        let mut current_instance = self
-            .current_shortcut_instance
-            .lock()
-            .map_err(|_| HotkeyError::RegistrationFailed("Failed to acquire lock".to_string()))?;
-
-        if let Some(shortcut) = current_instance.take() {
-            self.app_handle
-                .global_shortcut()
-                .unregister(shortcut)
-                .map_err(|e| {
-                    HotkeyError::RegistrationFailed(format!("Failed to unregister shortcut: {e}"))
-                })?;
-
-            // Clear current shortcut
-            if let Ok(mut current) = self.current_shortcut.lock() {
-                *current = None;
-            }
-
-            info!("Successfully unregistered global hotkey");
-            Ok(())
-        } else {
-            Err(HotkeyError::NotFound(
-                "No hotkey currently registered".to_string(),
-            ))
-        }
-    }
-
-    /// Updates the current hot-key registration with new configuration
-    ///
-    /// # Arguments
-    ///
-    /// * `new_config` - The new hot-key configuration
-    ///
-    /// # Errors
-    ///
-    /// Returns `HotkeyError` if the update fails
-    pub async fn update_hotkey(&mut self, new_config: &HotkeyConfig) -> Result<(), HotkeyError> {
-        // Simply unregister the old one and register the new one
-        let _ = self.unregister_hotkey().await; // Ignore error if nothing was registered
-        self.register_hotkey(new_config).await
-    }
-
-    /// Checks if a hot-key is currently registered
-    pub fn is_registered(&self) -> bool {
-        if let Ok(current_instance) = self.current_shortcut_instance.lock() {
-            current_instance.is_some()
-        } else {
-            false
-        }
-    }
-
-    /// Gets the currently registered hot-key shortcut
-    pub fn current_shortcut(&self) -> Option<String> {
-        if let Ok(current) = self.current_shortcut.lock() {
-            current.clone()
-        } else {
-            None
-        }
-    }
-}
-
-/// Validates a hot-key combination with comprehensive format support.
-///
-/// # Arguments
-///
-/// * `hot_key` - The hot-key string to validate
-///
-/// # Returns
-///
-/// Returns `Ok(())` if valid.
-///
-/// # Errors
-///
-/// Returns `AppError::HotKey` if the hot-key is invalid.
-/// Internal hot-key validation logic using Tauri's native shortcut parsing.
-///
-/// # Internal API
-/// This function is only intended for internal use and testing.
-pub async fn validate_hot_key_internal(hot_key: String) -> Result<(), AppError> {
-    if hot_key.is_empty() {
-        return Err(AppError::HotKey("Hot-key cannot be empty".to_string()));
-    }
-
-    // Enhanced validation - supports both old and new formats
-    let modifiers = ["CMD", "CMDORCTRL", "CTRL", "ALT", "OPTION", "SHIFT"];
-    let has_modifier = modifiers.iter().any(|m| hot_key.to_uppercase().contains(m));
-
-    if !has_modifier {
-        return Err(AppError::HotKey(
-            "Hot-key must contain at least one modifier key".to_string(),
-        ));
-    }
-
-    // 🟢 GREEN: Use Tauri's native shortcut parsing instead of custom logic
-    // This supports function keys (F1-F12), special keys, numeric keys, and all standard keys
-    match hot_key.parse::<Shortcut>() {
-        Ok(_) => Ok(()),
-        Err(e) => Err(AppError::HotKey(format!("Invalid shortcut format: {e}"))),
-    }
+    load_settings_internal().await
 }
 
 /// Tauri command wrapper for hot-key validation.
@@ -522,25 +229,10 @@ async fn register_global_hotkey(app_handle: AppHandle, config: HotkeyConfig) -> 
     register_global_hotkey_internal(app_handle, config).await
 }
 
-/// Register a global hotkey using the GlobalHotkeyService
-pub(crate) async fn register_global_hotkey_internal(
-    app_handle: AppHandle,
-    config: HotkeyConfig,
-) -> Result<(), String> {
-    let mut service = GlobalHotkeyService::new(app_handle).map_err(|e| e.to_string())?;
-
-    service
-        .register_hotkey(&config)
-        .await
-        .map_err(|e| e.to_string())
-}
-
-/// Tauri command to unregister the current global hotkey
+/// Tauri command wrapper to unregister the current global hotkey
 #[tauri::command]
 async fn unregister_global_hotkey(app_handle: AppHandle) -> Result<(), String> {
-    let mut service = GlobalHotkeyService::new(app_handle).map_err(|e| e.to_string())?;
-
-    service.unregister_hotkey().await.map_err(|e| e.to_string())
+    unregister_global_hotkey_internal(app_handle).await
 }
 
 /// Sets the auto-launch preference for the application.
@@ -813,192 +505,6 @@ fn greet(name: &str) -> String {
     format!("Hello, {name}! You've been greeted from Rust!")
 }
 
-/// Validates that the settings directory has proper permissions for read/write operations.
-///
-/// # Arguments
-///
-/// * `dir_path` - The directory path to validate
-///
-/// # Returns
-///
-/// Returns `Ok(())` if permissions are valid.
-///
-/// # Errors
-///
-/// Returns `AppError` if permissions are insufficient.
-/// Validates directory permissions for settings operations.
-///
-/// # Internal API
-/// This function is only intended for internal use and testing.
-pub fn validate_settings_directory_permissions(dir_path: &Path) -> Result<(), AppError> {
-    // Minimal implementation to pass the test
-    // Check if directory exists and is writable
-    if !dir_path.exists() {
-        return Err(AppError::FileSystem("Directory does not exist".to_string()));
-    }
-
-    // Try to create a test file to verify write permissions
-    let test_file = dir_path.join(".permission_test");
-    match std::fs::write(&test_file, "test") {
-        Ok(_) => {
-            // Clean up test file
-            let _ = std::fs::remove_file(&test_file);
-            Ok(())
-        }
-        Err(e) => Err(AppError::FileSystem(format!("Directory not writable: {e}"))),
-    }
-}
-
-/// Saves application settings to a specific directory (for testing and isolation).
-///
-/// # Arguments
-///
-/// * `settings` - The settings to save
-/// * `settings_dir` - The directory where settings should be saved
-///
-/// # Returns
-///
-/// Returns `Ok(())` on success.
-///
-/// # Errors
-///
-/// Returns `AppError` if the settings cannot be saved.
-pub async fn save_settings_to_dir(
-    settings: &AppSettings,
-    settings_dir: &PathBuf,
-) -> Result<(), AppError> {
-    // Ensure directory exists
-    if !settings_dir.exists() {
-        fs::create_dir_all(settings_dir)
-            .map_err(|e| AppError::FileSystem(format!("Failed to create settings dir: {e}")))?;
-    }
-
-    let settings_path = settings_dir.join("settings.json");
-    let backup_path = settings_dir.join("settings.json.backup");
-
-    // Ensure settings have current version
-    let mut settings_to_save = settings.clone();
-    settings_to_save.version = 1;
-
-    let json = serde_json::to_string_pretty(&settings_to_save)
-        .map_err(|e| AppError::Settings(format!("Failed to serialize settings: {e}")))?;
-
-    // Atomic write: write to temporary file first, then rename
-    let temp_path = settings_path.with_extension("json.tmp");
-
-    // Write to temporary file
-    fs::write(&temp_path, &json)
-        .map_err(|e| AppError::FileSystem(format!("Failed to write temp settings file: {e}")))?;
-
-    // Create backup of existing file if it exists
-    if settings_path.exists() {
-        fs::copy(&settings_path, &backup_path)
-            .map_err(|e| AppError::FileSystem(format!("Failed to create settings backup: {e}")))?;
-    }
-
-    // Atomically move temp file to final location
-    fs::rename(&temp_path, &settings_path)
-        .map_err(|e| AppError::FileSystem(format!("Failed to move temp settings file: {e}")))?;
-
-    Ok(())
-}
-
-/// Loads application settings from a specific directory with corruption recovery.
-///
-/// # Arguments
-///
-/// * `settings_dir` - The directory to load settings from
-///
-/// # Returns
-///
-/// Returns the loaded settings or default settings if the file doesn't exist.
-/// If the file is corrupt, attempts to recover from backup, then falls back to defaults.
-///
-/// # Errors
-///
-/// Returns `AppError` if all recovery attempts fail.
-/// Loads settings from a specific directory with backup recovery.
-///
-/// # Internal API
-/// This function is only intended for internal use and testing.
-pub async fn load_settings_from_dir(settings_dir: &PathBuf) -> Result<AppSettings, AppError> {
-    let settings_path = settings_dir.join("settings.json");
-    let backup_path = settings_dir.join("settings.json.backup");
-
-    if !settings_path.exists() {
-        return Ok(AppSettings::default());
-    }
-
-    // Try to load from main settings file
-    match try_load_settings_file(&settings_path) {
-        Ok(settings) => {
-            let original_version = settings.version;
-            let migrated_settings = migrate_settings(settings);
-            // If migration changed the version, save the updated settings
-            if migrated_settings.version != original_version {
-                // Save the migrated settings (fire and forget)
-                let _ = save_settings_to_dir(&migrated_settings, settings_dir).await;
-            }
-            Ok(migrated_settings)
-        }
-        Err(main_error) => {
-            error!("Warning: Main settings file corrupt: {main_error}");
-
-            // Try to recover from backup
-            if backup_path.exists() {
-                match try_load_settings_file(&backup_path) {
-                    Ok(backup_settings) => {
-                        info!("Successfully recovered settings from backup");
-                        let migrated_settings = migrate_settings(backup_settings);
-
-                        // Save the recovered settings to main file
-                        if let Err(save_error) =
-                            save_settings_to_dir(&migrated_settings, settings_dir).await
-                        {
-                            error!("Warning: Failed to save recovered settings: {save_error}");
-                        }
-
-                        Ok(migrated_settings)
-                    }
-                    Err(backup_error) => {
-                        error!("Warning: Backup settings file also corrupt: {backup_error}");
-
-                        // Move corrupt files aside for debugging
-                        let _ = fs::rename(
-                            &settings_path,
-                            settings_path.with_extension("json.corrupt"),
-                        );
-                        let _ =
-                            fs::rename(&backup_path, backup_path.with_extension("json.corrupt"));
-
-                        // Return defaults and save them
-                        let defaults = AppSettings::default();
-                        if let Err(save_error) = save_settings_to_dir(&defaults, settings_dir).await
-                        {
-                            error!("Warning: Failed to save default settings: {save_error}");
-                        }
-
-                        Ok(defaults)
-                    }
-                }
-            } else {
-                info!("No backup file available. Using defaults.");
-
-                // Move corrupt file aside and save defaults
-                let _ = fs::rename(&settings_path, settings_path.with_extension("json.corrupt"));
-                let defaults = AppSettings::default();
-                if let Err(save_error) = save_settings_to_dir(&defaults, settings_dir).await {
-                    error!("Warning: Failed to save default settings: {save_error}");
-                }
-
-                Ok(defaults)
-            }
-        }
-    }
-}
-
-// 🟢 GREEN: Minimal implementations for TDD tests
-
 /// Generates a filename with timestamp for audio recordings.
 ///
 /// # Returns
@@ -1157,120 +663,10 @@ pub async fn debug_record_real_audio_to_file(
     Ok(output_path)
 }
 
-/// Enum to identify different service components
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
-pub enum ServiceComponent {
-    AudioCapture,
-    Transcription,
-    TextInjection,
-}
-
-/// Service responsible for tracking backend component status
-pub struct BackendStatusService {
-    status: Arc<Mutex<BackendStatus>>,
-}
-
-impl BackendStatusService {
-    /// Creates a new backend status service with all services starting
-    pub fn new() -> Self {
-        Self {
-            status: Arc::new(Mutex::new(BackendStatus::new_starting())),
-        }
-    }
-
-    /// Gets the current status snapshot
-    pub fn get_current_status(&self) -> BackendStatus {
-        self.status.lock().unwrap().clone()
-    }
-
-    /// Updates the status of a specific service component
-    pub fn update_service_status(&mut self, component: ServiceComponent, status: ServiceStatus) {
-        if let Ok(mut current_status) = self.status.lock() {
-            // Update timestamp when any service changes (WASM-compatible)
-            current_status.timestamp = chrono::Utc::now().timestamp_millis() as u64;
-
-            // Update the specific service
-            match component {
-                ServiceComponent::AudioCapture => {
-                    current_status.audio_capture = status;
-                }
-                ServiceComponent::Transcription => {
-                    current_status.transcription = status;
-                }
-                ServiceComponent::TextInjection => {
-                    current_status.text_injection = status;
-                }
-            }
-        }
-    }
-
-    /// Emits status change event to frontend
-    pub fn emit_status_change(&self, app_handle: &AppHandle) -> Result<(), String> {
-        let status = self.get_current_status();
-        app_handle
-            .emit("speakr-status-changed", &status)
-            .map_err(|e| format!("Failed to emit status change: {e}"))
-    }
-
-    /// Emits heartbeat event to frontend
-    pub fn emit_heartbeat(&self, app_handle: &AppHandle) -> Result<(), String> {
-        let status = self.get_current_status();
-        app_handle
-            .emit("speakr-heartbeat", &status)
-            .map_err(|e| format!("Failed to emit heartbeat: {e}"))
-    }
-}
-
-impl Default for BackendStatusService {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 /// Tauri command to get current backend status
 #[tauri::command]
 async fn get_backend_status() -> Result<StatusUpdate, AppError> {
-    let service = get_global_backend_service().await;
-    let service_guard = service.lock().unwrap();
-    Ok(service_guard.get_current_status())
-}
-
-/// Gets the global backend status service instance.
-///
-/// # Returns
-///
-/// Returns a reference to the global service instance.
-/// Gets a reference to the global backend service instance.
-///
-/// # Internal API
-/// This function is only intended for internal use and testing.
-pub async fn get_global_backend_service() -> Arc<Mutex<BackendStatusService>> {
-    Arc::clone(&GLOBAL_BACKEND_SERVICE)
-}
-
-/// Updates the status of a specific service component in the global service.
-///
-/// # Arguments
-///
-/// * `component` - The service component to update
-/// * `status` - The new status for the component
-///
-/// # Examples
-///
-/// ```no_run
-/// # use speakr_lib::{update_global_service_status, ServiceComponent};
-/// # use speakr_types::ServiceStatus;
-/// #
-/// # #[tokio::main]
-/// # async fn main() {
-/// // Update audio capture service to ready
-/// update_global_service_status(ServiceComponent::AudioCapture, ServiceStatus::Ready).await;
-/// # }
-/// ```
-pub async fn update_global_service_status(component: ServiceComponent, status: ServiceStatus) {
-    let service = Arc::clone(&GLOBAL_BACKEND_SERVICE);
-    let mut service_guard = service.lock().unwrap();
-    service_guard.update_service_status(component, status);
+    get_backend_status_internal().await
 }
 
 /// Tauri command to update a service component status
@@ -1279,29 +675,12 @@ async fn update_service_status(
     component: ServiceComponent,
     status: ServiceStatus,
 ) -> Result<(), AppError> {
-    update_global_service_status(component, status).await;
-    Ok(())
-}
-
-/// Resets the global backend service to its initial state (for testing only).
-///
-/// This function is only available in test builds and should be called
-/// at the beginning of each test to ensure proper test isolation.
-/// Resets the global backend service to initial state for testing.
-///
-/// # Internal API
-/// This function is only intended for internal use and testing.
-#[cfg(any(test, debug_assertions))]
-pub async fn reset_global_backend_service() {
-    let service = Arc::clone(&GLOBAL_BACKEND_SERVICE);
-    let mut service_guard = service.lock().unwrap();
-    *service_guard = BackendStatusService::new();
+    update_service_status_internal(component, status).await
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder
-        ::default()
+    tauri::Builder::default()
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
@@ -1351,17 +730,17 @@ pub fn run() {
                 add_debug_log(
                     DebugLogLevel::Info,
                     "speakr-tauri",
-                    "Application starting in debug mode"
+                    "Application starting in debug mode",
                 );
                 add_debug_log(
                     DebugLogLevel::Debug,
                     "speakr-tauri",
-                    "Debug logging system initialized"
+                    "Debug logging system initialized",
                 );
                 add_debug_log(
                     DebugLogLevel::Info,
                     "speakr-tauri",
-                    "Debug panel available via toggle button"
+                    "Debug panel available via toggle button",
                 );
             }
 
@@ -1369,66 +748,67 @@ pub fn run() {
             let app_handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
                 let default_config = HotkeyConfig::default();
-                if let Ok(mut service) = GlobalHotkeyService::new(app_handle) {
-                    if let Err(e) = service.register_hotkey(&default_config).await {
+                if let Err(e) =
+                    register_global_hotkey_internal(app_handle.clone(), default_config.clone())
+                        .await
+                {
+                    error!(
+                        "⚠️  Failed to register default hotkey '{}': {}",
+                        default_config.shortcut, e
+                    );
+
+                    #[cfg(debug_assertions)]
+                    add_debug_log(
+                        DebugLogLevel::Warn,
+                        "speakr-tauri",
+                        &format!("Failed to register default hotkey: {e}"),
+                    );
+
+                    warn!("💡 You can change the hotkey in Settings to avoid conflicts");
+
+                    // Try a fallback hotkey if the default fails
+                    let fallback_config = HotkeyConfig {
+                        shortcut: "CmdOrCtrl+Alt+F2".to_string(),
+                        enabled: true,
+                    };
+
+                    if let Err(e2) =
+                        register_global_hotkey_internal(app_handle, fallback_config.clone()).await
+                    {
                         error!(
-                            "⚠️  Failed to register default hotkey '{}': {}",
-                            default_config.shortcut,
-                            e
+                            "⚠️  Fallback hotkey '{}' also failed: {}",
+                            fallback_config.shortcut, e2
                         );
 
                         #[cfg(debug_assertions)]
                         add_debug_log(
-                            DebugLogLevel::Warn,
+                            DebugLogLevel::Error,
                             "speakr-tauri",
-                            &format!("Failed to register default hotkey: {e}")
+                            &format!("Fallback hotkey also failed: {e2}"),
                         );
 
-                        warn!("💡 You can change the hotkey in Settings to avoid conflicts");
-
-                        // Try a fallback hotkey if the default fails
-                        let fallback_config = HotkeyConfig {
-                            shortcut: "CmdOrCtrl+Alt+F2".to_string(),
-                            enabled: true,
-                        };
-
-                        if let Err(e2) = service.register_hotkey(&fallback_config).await {
-                            error!(
-                                "⚠️  Fallback hotkey '{}' also failed: {}",
-                                fallback_config.shortcut,
-                                e2
-                            );
-
-                            #[cfg(debug_assertions)]
-                            add_debug_log(
-                                DebugLogLevel::Error,
-                                "speakr-tauri",
-                                &format!("Fallback hotkey also failed: {e2}")
-                            );
-
-                            warn!(
-                                "🔧 App will start without global hotkey - configure one in Settings"
-                            );
-                        } else {
-                            info!("✅ Using fallback hotkey: {}", fallback_config.shortcut);
-
-                            #[cfg(debug_assertions)]
-                            add_debug_log(
-                                DebugLogLevel::Info,
-                                "speakr-tauri",
-                                &format!("Using fallback hotkey: {}", fallback_config.shortcut)
-                            );
-                        }
+                        warn!(
+                            "🔧 App will start without global hotkey - configure one in Settings"
+                        );
                     } else {
-                        info!("✅ Default hotkey registered: {}", default_config.shortcut);
+                        info!("✅ Using fallback hotkey: {}", fallback_config.shortcut);
 
                         #[cfg(debug_assertions)]
                         add_debug_log(
                             DebugLogLevel::Info,
                             "speakr-tauri",
-                            &format!("Default hotkey registered: {}", default_config.shortcut)
+                            &format!("Using fallback hotkey: {}", fallback_config.shortcut),
                         );
                     }
+                } else {
+                    info!("✅ Default hotkey registered: {}", default_config.shortcut);
+
+                    #[cfg(debug_assertions)]
+                    add_debug_log(
+                        DebugLogLevel::Info,
+                        "speakr-tauri",
+                        &format!("Default hotkey registered: {}", default_config.shortcut),
+                    );
                 }
             });
             Ok(())
@@ -1824,21 +1204,8 @@ mod tests {
         assert_eq!(recovered, good_settings);
     }
 
-    // 🔴 RED: Tests for status indicator backend functionality
-    // test_backend_status_service_creation moved to tests/status_tests.rs
-
-    // test_backend_status_service_update_single_service moved to tests/status_tests.rs
-
-    // test_backend_status_service_all_services_ready moved to tests/status_tests.rs
-
-    // test_backend_status_service_error_handling moved to tests/status_tests.rs
-
-    // test_backend_status_timestamps moved to tests/status_tests.rs
-
     #[tokio::test]
     async fn test_get_backend_status_tauri_command() {
-        // 🔴 RED: This test should fail because the command doesn't exist yet
-
         // This would test the Tauri command interface
         // We can't easily test the Tauri command without a full Tauri context,
         // so for now we test the underlying service directly
@@ -1851,7 +1218,6 @@ mod tests {
     // TDD: Tests for audio recording with file saving functionality
     #[tokio::test]
     async fn test_debug_record_audio_to_file_saves_with_timestamp() {
-        // 🔴 RED: This test should fail because the function doesn't exist yet
         use std::time::SystemTime;
         use tempfile::TempDir;
 
@@ -1899,7 +1265,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_debug_record_audio_to_file_creates_unique_filenames() {
-        // 🔴 RED: This test should fail because the function doesn't exist yet
         use tempfile::TempDir;
 
         // Arrange
@@ -1926,7 +1291,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_save_audio_samples_to_wav_file() {
-        // 🔴 RED: This test should fail because the function doesn't exist yet
         use tempfile::TempDir;
 
         // Arrange
@@ -1962,7 +1326,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_generate_audio_filename_with_timestamp() {
-        // 🔴 RED: This test should fail because the function doesn't exist yet
         use std::time::SystemTime;
 
         // Act
@@ -1996,7 +1359,6 @@ mod tests {
     #[tokio::test]
     #[ignore = "Requires audio hardware access - run manually with 'cargo test -- --ignored'"]
     async fn test_debug_real_audio_recording_integration() {
-        // 🔴 RED: This test should fail because the real integration doesn't exist yet
         use tempfile::TempDir;
 
         // Arrange

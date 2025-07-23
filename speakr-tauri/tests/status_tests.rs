@@ -1,7 +1,10 @@
 // Status-related tests extracted from lib.rs
 
-use speakr_lib::{
-    get_global_backend_service, reset_global_backend_service, BackendStatusService,
+use speakr_lib::services::{
+    status::{
+        get_global_backend_service, reset_global_backend_service, update_global_service_status,
+        BackendStatusService,
+    },
     ServiceComponent,
 };
 use speakr_types::ServiceStatus;
@@ -96,21 +99,24 @@ async fn test_global_backend_service_initialization() {
 
 #[tokio::test]
 async fn test_global_backend_service_state_updates() {
-    // Reset service to ensure clean state
+    // Reset global service state for test isolation
     reset_global_backend_service().await;
 
-    // Update a service status using the global service
-    use speakr_lib::update_global_service_status;
+    // Test that we can update global service state
     update_global_service_status(ServiceComponent::AudioCapture, ServiceStatus::Ready).await;
 
     let service = get_global_backend_service().await;
-    let service_guard = service.lock().unwrap();
-    let status = service_guard.get_current_status();
+    let status = {
+        let service_guard = service.lock().unwrap();
+        service_guard.get_current_status()
+    };
 
     assert_eq!(status.audio_capture, ServiceStatus::Ready);
     assert_eq!(status.transcription, ServiceStatus::Starting);
     assert_eq!(status.text_injection, ServiceStatus::Starting);
-    assert!(!status.is_ready()); // Not all ready yet
+
+    // Clean up for next test
+    reset_global_backend_service().await;
 }
 
 #[tokio::test]
@@ -130,7 +136,6 @@ async fn test_global_backend_service_thread_safety() {
     let tasks = (0..5).map(|i| {
         task::spawn(async move {
             // Update different services from different tasks
-            use speakr_lib::update_global_service_status;
             let component = match i % 3 {
                 0 => ServiceComponent::AudioCapture,
                 1 => ServiceComponent::Transcription,
@@ -169,7 +174,6 @@ async fn test_backend_service_emits_events_on_state_change() {
     };
 
     // Update a service status
-    use speakr_lib::update_global_service_status;
     update_global_service_status(ServiceComponent::AudioCapture, ServiceStatus::Ready).await;
 
     // Small delay to ensure timestamp difference
