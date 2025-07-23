@@ -2,6 +2,7 @@
 date: 2025-07-23
 requirement: FR-1-global-hotkey
 status: PARTIALLY COMPLETE
+prepared_by: o3
 ---
 # Implementation Report: FR-1 - Global Hot-key
 

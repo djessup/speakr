@@ -5,6 +5,7 @@ status: PARTIALLY COMPLETE
 prepared_by: o4-mini
 ---
 # markdownlint-disable MD013
+
 # Implementation Report: FR-2 - Audio Capture
 
 ## Implementation Summary
@@ -119,7 +120,9 @@ classDiagram
     AudioRecorder --> RecordingConfig
 ```
 
-The class diagram illustrates the trait-based architecture enabling dependency injection and testing. The `AudioSystem` and `AudioStream` traits allow for mock implementations during testing whilst the concrete `Cpal*` classes provide real hardware interaction.
+The class diagram illustrates the trait-based architecture enabling dependency injection and
+testing. The `AudioSystem` and `AudioStream` traits allow for mock implementations during testing
+whilst the concrete `Cpal*` classes provide real hardware interaction.
 
 ```mermaid
 stateDiagram-v2
@@ -137,20 +140,29 @@ stateDiagram-v2
     }
 ```
 
-The state diagram shows the audio recorder's lifecycle, with proper error handling and clean transitions between states.
+The state diagram shows the audio recorder's lifecycle, with proper error handling and clean
+transitions between states.
 
 ## Noteworthy
 
-The implementation demonstrates excellent software engineering practices with comprehensive test coverage using dependency injection and mock objects. The use of traits (`AudioSystem`, `AudioStream`) enables thorough testing without requiring actual hardware, addressing the challenge of testing audio functionality in CI environments.
+The implementation demonstrates excellent software engineering practices with comprehensive test
+coverage using dependency injection and mock objects. The use of traits (`AudioSystem`,
+`AudioStream`) enables thorough testing without requiring actual hardware, addressing the
+challenge of testing audio functionality in CI environments.
 
-Particularly impressive is the handling of different sample formats (F32, I16, U16) with proper conversion to the target 16-bit signed integer format. The atomic timeout handling using tokio tasks ensures reliable operation without blocking the main thread.
+Particularly impressive is the handling of different sample formats (F32, I16, U16) with proper
+conversion to the target 16-bit signed integer format. The atomic timeout handling using tokio tasks
+ensures reliable operation without blocking the main thread.
 
-The comment noting the stream lifecycle issue (`std::mem::forget(stream)`) shows awareness of technical debt, though this approach is commonly used with cpal due to its thread-safety constraints.
+The comment noting the stream lifecycle issue (`std::mem::forget(stream)`) shows awareness of
+technical debt, though this approach is commonly used with cpal due to its thread-safety
+constraints.
 
 ## Related Requirements
 
 - [FR-3](../FR-3-transcription.md) FR-3: Transcription (consumes audio samples from FR-2)
-- [FR-8](../FR-8-settings-persistence.md) FR-8: Settings Persistence (should store audio duration preference)
+- [FR-8](../FR-8-settings-persistence.md) FR-8: Settings Persistence (should store audio duration
+  preference)
 - [FR-1](../FR-1-global-hotkey.md) FR-1: Global Hotkey (triggers audio capture)
 
 ## References

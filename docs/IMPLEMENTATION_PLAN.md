@@ -69,17 +69,32 @@ Reference: [FR-9 Auto-update](specs/FR-9-auto-update.md)
 ## Progress Checklist
 
 - [x] 0. Preparation complete
+      - **Status:** Preparation tasks completed.
 - [x] 1. Repository scaffold merged ([INIT-01](specs/INIT-01-project-scaffold.md))
-- [ ] 2.1 Audio capture ([FR-2](specs/FR-2-audio-capture.md)) implemented & tested
+      - **Status:** Repository scaffold implemented (4 crates; `speakr-core` (backend processing),
+        `speakr-tauri` (Tauri backend), `speakr-ui` (Leptos front-end) and `speakr-types` (shared
+        types)).
+- [x] 2.1 Audio capture ([FR-2](specs/FR-2-audio-capture.md)) implemented & tested
+      - **Status:** Audio capture tested via debug UI, verified WAV file is written to disk and
+        contains the expected audio.
 - [ ] 2.2 Transcription ([FR-3](specs/FR-3-transcription.md)) implemented & tested
+      - **Status:** Not started
 - [ ] 2.3 Text injection ([FR-4](specs/FR-4-text-injection.md)) implemented & tested
-- [ ] 2.4 Injection fallback ([FR-5](specs/FR-5-injection-fallback.md)) implemented & tested
+      - **Status:** Not started
+- [ ] 2.4 Injection Not started
+      - **Status:** Preparation tasks completed.
 - [ ] 2.5 Status events ([FR-7](specs/FR-7-status-events.md)) implemented & tested
+      - **Status:** Not started
 - [ ] 3.1 Global hot-key ([FR-1](specs/FR-1-global-hotkey.md)) registered & tested
+      - **Status:** Not started
 - [ ] 3.2 Backend pipeline wired
-- [ ] 3.3 Settings persistence ([FR-8](specs/FR-8-settings-persistence.md)) implemented & tested
-- [ ] 4.1 Settings UI ([FR-6](specs/FR-6-settings-ui.md)) implemented & tested
+      - **Status:** Not started
+- [x] 3.3 Settings persistence ([FR-8](specs/FR-8-settings-persistence.md)) implemented & tested
+      - **Status:**
+- [~] 4.1 Settings UI ([FR-6](specs/FR-6-settings-ui.md)) implemented & tested
+      - **Status:** Preparation tasks completed.
 - [ ] 4.2 Accessibility audits ([NFR-accessibility](specs/NFR-accessibility.md)) passing
+      - **Status:** Preparation tasks completed.
 - [ ] Non-functional targets ([Latency](specs/NFR-latency.md), [Footprint](specs/NFR-footprint.md),
       [Reliability](specs/NFR-reliability.md), [Security](specs/NFR-security.md),
       [Compatibility](specs/NFR-compatibility.md)) met

@@ -1,8 +1,12 @@
-# Speakr – A Local Dictation Hot-Key Utility (Rust + Tauri + Leptos)
+# System Description
+
+## Speakr – a Local Dictation Utility (Rust + Tauri + Leptos)
 
 A tiny, **privacy-first** macOS desktop app that listens for a global hot-key, records a short audio
-clip, transcribes it locally with Whisper, then **types** the text into whatever field currently has
-focus. Everything runs on-device; no cloud calls, no Electron bloat.
+clip, transcribes it locally with Whisper, then **types** the text into whatever currently has
+focus.
+
+Everything runs on-device; no network calls (besides the initial model download).
 
 ---
 
@@ -12,8 +16,8 @@ focus. Everything runs on-device; no cloud calls, no Electron bloat.
 ┌──────────────────────────────┐
 │        Speakr (UI)           │  ← Leptos + Tauri WebView (optional window / tray)
 └───────────────┬──────────────┘
-                │ invoke/emit
-        Global Shortcut  ▲  Settings (model path, hot-key, …)
+                │ <invoke/emit>
+        Global Shortcut   ▲    Settings (model path, hot-key, …)
                 ▼         │
 ┌─────────────────────────┴──────────────────────────┐
 │            speakr-core  (Rust lib)                 │
