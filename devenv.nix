@@ -221,25 +221,30 @@ in
     # Documentation
     docs-build = {
       description = "Build documentation";
-      exec = "cd $DEVENV_ROOT && mdbook build";
-    };
-    docs-watch = {
-      description = "Watch documentation and rebuild on changes";
-      exec = "cd $DEVENV_ROOT && mdbook watch";
+      exec = "
+        local BOOK_DIR=$DEVENV_ROOT/book/
+        pushd $BOOK_DIR && \
+        mdbook build && \
+        popd
+      ";
     };
     docs-serve = {
       description = "Start documentation server";
-      exec = "cd $DEVENV_ROOT && mdbook serve --open";
+      exec = "
+        local BOOK_DIR=$DEVENV_ROOT/book/
+        pushd $BOOK_DIR && \
+        mdbook serve --open && \
+        popd
+      ";
     };
     docs-install-plugins = {
       description = "Install mdbook plugins";
       exec = ''
-        pushd $DEVENV_ROOT/book/speakr_theme
         local BOOK_DIR=$DEVENV_ROOT/book/
-        local THEME_DIR=$BOOK_DIR/speakr_theme
-        mdbook-admonish install $BOOK_DIR
-        mdbook-mermaid install $BOOK_DIR
-        mdbook-pagetoc install $BOOK_DIR
+        pushd $THEME_DIR && \
+        mdbook-admonish install $BOOK_DIR && \
+        mdbook-mermaid install $BOOK_DIR && \
+        mdbook-pagetoc install $BOOK_DIR && \
         popd
       '';
     };
