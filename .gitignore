@@ -2,7 +2,10 @@
 dist/
 dist-test/
 target/
-book/
+book/*
+!book/book.toml
+!book/.gitignore
+!book/theme
 
 # Development environment files
 .env

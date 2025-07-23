@@ -77,12 +77,12 @@ in
       wasm-pack # WebAssembly build tool
       pkg-config # Package configuration
 
-
       # Documentation tools
       mdbook # Documentation generator
       mdbook-linkcheck # Link checker for mdbook
       mdbook-admonish # Admonition blocks for mdbook
       mdbook-mermaid # Mermaid diagrams for mdbook
+      mdbook-pagetoc # Page Table of Contents for mdbook
 
       # Shell and productivity tools
       ripgrep # Fast text search
@@ -234,10 +234,13 @@ in
     docs-install-plugins = {
       description = "Install mdbook plugins";
       exec = ''
-        mdbook-admonish install $DEVENV_ROOT --css-dir $DEVENV_ROOT/docs/theme
-        mdbook-mermaid install $DEVENV_ROOT
-        cp $DEVENV_ROOT/docs/theme/mermaid-init.js $DEVENV_ROOT/docs/theme/mermaid.min.js $DEVENV_ROOT/docs/theme/
-        rm -f $DEVENV_ROOT/docs/theme/mermaid-init.js $DEVENV_ROOT/docs/theme/mermaid.min.js
+        pushd $DEVENV_ROOT/book/speakr_theme
+        local BOOK_DIR=$DEVENV_ROOT/book/
+        local THEME_DIR=$BOOK_DIR/speakr_theme
+        mdbook-admonish install $BOOK_DIR
+        mdbook-mermaid install $BOOK_DIR
+        mdbook-pagetoc install $BOOK_DIR
+        popd
       '';
     };
 

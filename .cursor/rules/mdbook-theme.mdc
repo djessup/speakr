@@ -1,0 +1,92 @@
+---
+description: mdBook theme files are stored in the book/ directory and referenced in the book.toml file via `additional-css` and `additional-js`. additional-* files are loaded on top of the default theme.
+globs: book/
+alwaysApply: false
+---
+<mdbook_themes>
+
+## mdBook directory structure
+
+ book/
+├──  book.toml                    # <-- mdBook configuration file
+├── 󱧼 build                        # <-- Generated build output directory
+│   ├── ...
+├──  default-theme                # <-- Default theme (reference copy only, not in build)
+│   ├──  book.toml                # <-- Sample config file (not used)
+│   ├── 󰣞 src                      # <-- Sample content directory (not in build)
+│   │   ├── ...
+│   └──  theme
+│       ├──  book.js              # <-- Default JS file (reference copy only)
+│       ├──  css                  # <-- Default CSS files (reference copy only)
+│       │   ├──  chrome.css
+│       │   ├──  general.css
+│       │   ├──  print.css
+│       │   └──  variables.css
+│       ├──  favicon.png
+│       ├── 󰕙 favicon.svg
+│       ├──  fonts                # Font files (reference copy only)
+│       │   ├──  fonts.css
+│       │   ├──  *.woff2
+│       ├──  highlight.css
+│       ├──  highlight.js
+│       └──  index.hbs            # Default page template (reference copy only)
+│
+├──  mdbook-admonish.css          # <-- Plugin CSS file (included via book.toml)
+├──  mermaid-init.js              # <-- Plugin JS file (included via book.toml)
+├──  mermaid.min.js               # <-- Plugin JS file (included via book.toml)
+└──  theme                        # <-- Custom theme directory
+    ├──  css
+    │   ├──  chrome.css           # <-- included via book.toml
+    │   └──  variables.css        # <-- included via book.toml
+    └──  js
+        └──  book.js              # <-- included via book.toml
+
+## Default theme
+
+The `book/default-theme` directory is a **copy** of the mdBook default theme. Changes made to the `default-theme` directory are not reflected in the build output in any way. It is for reference purposes only so you can easily see what the default theme files look like.
+
+## Theme customisation
+
+There are two ways to customise the theme:
+
+1. **Additional CSS and JS files** that are loaded on top of the base theme. This is done by adding the files to the `book.toml` file via `additional-css` and `additional-js` (paths are relative to the `book/` directory):
+
+    ```toml
+    [output.html]
+    additional-css = ["./theme/css/custom.css"]
+    additional-js = ["./theme/js/custom.js"]
+    ```
+
+2. **Custom theme** that selectively replaces the default theme files. The files you can override are:
+
+- `index.hbs` (the handlebars template)
+- `head.hbs` (appended to the HTML <head> section)
+- `header.hbs` (appended on top of every book page)
+- `css/chrome.css` (for UI elements)
+- `css/general.css` (the base styles)
+- `css/print.css` (the style for printer output)
+- `css/variables.css` (contains variables used in other CSS files)
+- `book.js` (mostly used to add client side functionality, like hiding / un-hiding the sidebar, changing the theme, …)
+- `highlight.js` (the JavaScript that is used to highlight code snippets, you should not need to modify this)
+- `highlight.css` (the theme used for the code highlighting)
+- `favicon.svg` and `favicon.png` (the favicon that will be used. The SVG version is used by newer browsers)
+- `fonts/fonts.css` (contains the definition of which fonts to load. Custom fonts can be included in the fonts directory)
+
+Custom themes are organised in a directory structure that mirrors the default theme, containing the files you want to override. Then you can reference the theme in the `book.toml` file via `theme`:
+
+    ```toml
+    [output.html]
+    theme = "./theme"
+    ```
+</theme_customisations>
+<build_process>
+When mdBook builds the book, it reads the `book.toml` file and then:
+1. Copies the theme files (custom and/or default) to the `build` directory.
+2. Copies any additional CSS and JS files to the `build` directory.
+3. Converts the Markdown files to HTML using the handlebars template(s) and saves them to the `build` directory.
+</build_process>
+<references>
+- [mdBook theme documentation](https://rust-lang.github.io/mdBook/format/theme/index.html)
+- [mdBook theme example](https://rust-lang.github.io/mdBook/format/theme/index-hbs.html)
+</references>
+</mdbook_themes>
