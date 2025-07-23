@@ -39,12 +39,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("   📤 Output:     {}", output_file.display());
     println!();
 
-    // Use temp directory if no custom workspace specified, otherwise use persistent directory
+    // Use temp directory if no custom workspace specified, otherwise use user-provided directory
     let result = if let Some(workspace_path) = workspace_dir {
         // Use persistent directory
         let updater = ModelListUpdater::with_repo(workspace_path.clone(), &repo_name);
         println!(
-            "   📁 Workspace:  {} (persistent)",
+            "   📁 Workspace:  {} (user-provided)",
             workspace_path.display()
         );
         process_models(&updater, &output_file).await
