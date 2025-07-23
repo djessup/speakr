@@ -54,47 +54,50 @@ in
   };
 
   # Development packages
-  packages = with pkgs; [
-    # Core development tools
-    git
-    curl
-    wget
-    jq
+  packages =
+    with pkgs;
+    [
+      # Core development tools
+      git
+      git-lfs
+      curl
+      wget
+      jq
 
-    # macOS-specific libraries
-    darwin.libiconv
-    # darwin.apple_sdk.frameworks.Security
-    # darwin.apple_sdk.frameworks.CoreFoundation
-    # darwin.apple_sdk.frameworks.SystemConfiguration
+      # Rust ecosystem tools
+      cargo-watch # Auto-rebuild on file changes
+      cargo-expand # Expand macros for debugging
+      cargo-audit # Security auditing
+      cargo-outdated # Check for outdated dependencies
+      cargo-tauri # Tauri framework
+      cargo-tarpaulin # Code coverage for Rust
 
-    # Rust ecosystem tools
-    cargo-watch # Auto-rebuild on file changes
-    cargo-expand # Expand macros for debugging
-    cargo-audit # Security auditing
-    cargo-outdated # Check for outdated dependencies
-    cargo-tauri # Tauri framework
-    cargo-tarpaulin # Code coverage for Rust
+      # Tauri and frontend tools
+      trunk # WebAssembly web application bundler
+      wasm-pack # WebAssembly build tool
+      pkg-config # Package configuration
 
-    # Tauri and frontend tools
-    trunk # WebAssembly web application bundler
-    wasm-pack # WebAssembly build tool
 
-    # Documentation tools
-    mdbook # Documentation generator
-    mdbook-linkcheck # Link checker for mdbook
-    mdbook-admonish # Admonition blocks for mdbook
-    mdbook-mermaid # Mermaid diagrams for mdbook
+      # Documentation tools
+      mdbook # Documentation generator
+      mdbook-linkcheck # Link checker for mdbook
+      mdbook-admonish # Admonition blocks for mdbook
+      mdbook-mermaid # Mermaid diagrams for mdbook
 
-    # Shell and productivity tools
-    ripgrep # Fast text search
-    fd # Fast file finder
-    bat # Better cat with syntax highlighting
-    eza # Better ls with colors
-    fzf # Fuzzy finder
-    pre-commit # Pre-commit hooks
-    markdownlint-cli # Markdown linter
-    # direnv # Directory-based environments
-  ];
+      # Shell and productivity tools
+      ripgrep # Fast text search
+      fd # Fast file finder
+      bat # Better cat with syntax highlighting
+      eza # Better ls with colors
+      fzf # Fuzzy finder
+      pre-commit # Pre-commit hooks
+      markdownlint-cli # Markdown linter
+      # direnv # Directory-based environments
+    ]
+    ++ lib.optionals pkgs.stdenv.isDarwin [
+      # macOS-specific libraries
+      pkgs.darwin.libiconv
+    ];
 
   # Development scripts
   scripts = {

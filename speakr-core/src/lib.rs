@@ -35,10 +35,8 @@
 //! }
 //! ```
 
+//
+// Modules
+//
 pub mod audio;
-
-// Re-export commonly used types for convenience
-pub use audio::{
-    AudioCaptureError, AudioRecorder, AudioSettings, RecordingConfig, RecordingResult, CHANNELS,
-    SAMPLE_RATE_HZ,
-};
+pub mod model;
