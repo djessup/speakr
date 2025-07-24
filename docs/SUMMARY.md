@@ -48,10 +48,11 @@
 
 # Working Notes
 
-- [`speakr-tauri/lib.rs` refactor](refactor/speakr-tauri_lib-rs_refactor.md)
+- [`speakr-tauri/lib.rs` refactor](refactor/README.md)
   - [Phase 1](refactor/SPEAKR-TAURI_LIB-RS_PHASE_1.md)
   - [Phase 2](refactor/SPEAKR-TAURI_LIB-RS_PHASE_2.md)
   - [Phase 3](refactor/SPEAKR-TAURI_LIB-RS_PHASE_3.md)
   - [Phase 4](refactor/SPEAKR-TAURI_LIB-RS_PHASE_4.md)
   - [Phase 5](refactor/SPEAKR-TAURI_LIB-RS_PHASE_5.md)
     - [Migration Notes](refactor/MIGRATION_NOTES_PHASE_5.md)
+- [Rust Comment Improvement Tracking](refactor/RUST_DOCUMENTATION_TRACKING.md)

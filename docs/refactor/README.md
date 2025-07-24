@@ -187,11 +187,11 @@ responsibilities that should be separated for better maintainability.
 
 ## Implementation Strategy
 
-1. [ ] [Phase 1: Extract Tests](./refactor/SPEAKR-TAURI_LIB-RS_PHASE_1.md)
-2. [ ] [Phase 2: Extract Services](./refactor/SPEAKR-TAURI_LIB-RS_PHASE_2.md)
-3. [ ] [Phase 3: Extract Settings](./refactor/SPEAKR-TAURI_LIB-RS_PHASE_3.md)
-4. [ ] [Phase 4: Extract Debug & Audio](./refactor/SPEAKR-TAURI_LIB-RS_PHASE_4.md)
-5. [ ] [Phase 5: Extract Commands & Finalize](./refactor/SPEAKR-TAURI_LIB-RS_PHASE_5.md)
+1. [ ] [Phase 1: Extract Tests](SPEAKR-TAURI_LIB-RS_PHASE_1.md)
+2. [ ] [Phase 2: Extract Services](SPEAKR-TAURI_LIB-RS_PHASE_2.md)
+3. [ ] [Phase 3: Extract Settings](SPEAKR-TAURI_LIB-RS_PHASE_3.md)
+4. [ ] [Phase 4: Extract Debug & Audio](SPEAKR-TAURI_LIB-RS_PHASE_4.md)
+5. [ ] [Phase 5: Extract Commands & Finalize](SPEAKR-TAURI_LIB-RS_PHASE_5.md)
 
 ## Refactoring Process Overview
 

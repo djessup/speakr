@@ -34,7 +34,7 @@ large comment signposts to help navigate the file easily.
 
 ### speakr-core/src/
 
-- [~] `lib.rs`
+- [x] `lib.rs` ✅ **COMPLETED**
 - [ ] `audio/mod.rs`
 - [ ] `model/mod.rs`
 - [ ] `model/list.rs`
