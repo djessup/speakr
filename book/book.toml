@@ -40,3 +40,6 @@ command = "mdbook-mermaid"
 
 [preprocessor.pagetoc]
 command = "mdbook-pagetoc"
+
+[preprocessor.alerts]
+command = "mdbook-alerts"

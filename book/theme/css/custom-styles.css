@@ -53,10 +53,11 @@ body {
   color: var(--text-sidebar);
   text-decoration: none;
   border-radius: var(--radius-md);
-  margin: 0 var(--space-md);
   transition: all var(--transition-fast);
   font-weight: 400;
   position: relative;
+  width: -webkit-fill-available;
+  margin-right: var(--space-sm);
 }
 
 .chapter li > a strong {
@@ -88,6 +89,12 @@ body {
   border-radius: 2px;
   box-shadow: 0 0 8px rgba(255, 107, 107, 0.4);
   z-index: 1000;
+}
+
+.chapter li > a.toggle {
+  padding: 5px 10px;
+  margin-right: var(--space-md);
+  width: auto;
 }
 
 /* Section Headings (Part Titles) */
@@ -161,10 +168,7 @@ body {
   transform: translateY(-50%);
 }
 
-.chapter li.expanded > a,
-.chapter li.collapsed > a {
-  padding-right: calc(var(--space-lg) + 2rem);
-}
+
 
 .chapter ol {
   max-height: 1000px;
@@ -181,12 +185,12 @@ body {
 
 .chapter li li a {
   padding-left: calc(var(--space-lg) + var(--space-md));
-  font-size: 0.9em;
+  font-size: 95%;
 }
 
 .chapter li li li a {
   padding-left: calc(var(--space-lg) + var(--space-xl));
-  font-size: 0.85em;
+  /* font-size: 0.85em; */
 }
 
 /* Content Area */

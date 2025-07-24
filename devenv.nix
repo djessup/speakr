@@ -83,6 +83,7 @@ in
       mdbook-admonish # Admonition blocks for mdbook
       mdbook-mermaid # Mermaid diagrams for mdbook
       mdbook-pagetoc # Page Table of Contents for mdbook
+      mdbook-alerts # GitHub-style admonitions for mdbook
 
       # Shell and productivity tools
       ripgrep # Fast text search
@@ -221,31 +222,26 @@ in
     # Documentation
     docs-build = {
       description = "Build documentation";
-      exec = "
-        local BOOK_DIR=$DEVENV_ROOT/book/
-        pushd $BOOK_DIR && \
-        mdbook build && \
-        popd
-      ";
+      exec = ''
+        BOOK_DIR="''${DEVENV_ROOT}/book/"
+        mdbook build "''${BOOK_DIR}"
+      '';
     };
     docs-serve = {
       description = "Start documentation server";
-      exec = "
-        local BOOK_DIR=$DEVENV_ROOT/book/
-        pushd $BOOK_DIR && \
-        mdbook serve --open && \
-        popd
-      ";
+      exec = ''
+        BOOK_DIR="''${DEVENV_ROOT}/book/"
+        mdbook serve --open "''${BOOK_DIR}"
+      '';
     };
     docs-install-plugins = {
       description = "Install mdbook plugins";
       exec = ''
-        local BOOK_DIR=$DEVENV_ROOT/book/
-        pushd $THEME_DIR && \
-        mdbook-admonish install $BOOK_DIR && \
-        mdbook-mermaid install $BOOK_DIR && \
-        mdbook-pagetoc install $BOOK_DIR && \
-        popd
+          BOOK_DIR="''${DEVENV_ROOT}/book/"
+          pushd "''${BOOK_DIR}"
+          mdbook-admonish install .
+          mdbook-mermaid install .
+          popd
       '';
     };
 
