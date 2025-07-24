@@ -52,12 +52,11 @@ jobs:
 
       - name: Build documentation with mdBook
         run: devenv shell docs-build
-        # run: mdbook build
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ./book
+          path: ./book/build
 
   # Deploy
   deploy-docs:
