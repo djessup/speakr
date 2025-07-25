@@ -47,7 +47,7 @@ large comment signposts to help navigate the file easily.
 ### speakr-tauri/src/
 
 - [x] `lib.rs` ✅ **COMPLETED**
-- [ ] `main.rs`
+- [x] `main.rs` ✅ **COMPLETED**
 - [ ] `audio/mod.rs`
 - [ ] `audio/files.rs`
 - [ ] `audio/recording.rs`
@@ -73,9 +73,7 @@ large comment signposts to help navigate the file easily.
 
 - [x] `lib.rs` ✅ **COMPLETED**
 
-### speakr-ui/src/
-
-- [ ] `lib.rs`
+- [x] `lib.rs` ✅ **COMPLETED**
 - [ ] `app.rs`
 - [ ] `debug.rs`
 - [ ] `settings.rs`
