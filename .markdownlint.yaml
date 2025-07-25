@@ -19,7 +19,7 @@ line-length: # MD013
   stern: true
 
 no-duplicate-heading: # MD024
-  siblings_only: false
+  siblings_only: true
 
 single-h1: false # MD025
 
