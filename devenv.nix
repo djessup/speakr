@@ -16,6 +16,9 @@ in
   # Load environment variables from .env
   dotenv.enable = true;
 
+  # Enable devcontainer support (auto-generates .devcontainer.json)
+  devcontainer.enable = true;
+
   # Define environment variables
   env = {
     PROJECT_NAME = "Speakr";
