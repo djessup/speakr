@@ -1,0 +1,30 @@
+/* Dark theme styles */
+
+html.dark {
+  /* Backgrounds */
+  --bg-primary: #1a202c; /* Slate-900 */
+  --bg-secondary: #2d3748; /* Slate-800 */
+  --bg-tertiary: #4a5568; /* Slate-700 */
+  --bg-sidebar: #171923; /* Almost black */
+  --bg-sidebar-hover: #2d3748;
+
+  /* Text */
+  --text-primary: #f7fafc; /* Slate-50 */
+  --text-secondary: #e2e8f0; /* Slate-100 */
+  --text-muted: #a0aec0; /* Slate-400 */
+  --text-sidebar: #cbd5e0; /* Slate-300 */
+  --text-sidebar-active: #ffffff;
+
+  /* Borders */
+  --border-color: #4a5568; /* Slate-600 */
+  --border-hover: #718096; /* Slate-500 */
+
+  /* Accent (kept bright for contrast) */
+  --accent-color: #ff6b6b;
+  --accent-hover: #ff5252;
+
+  /* Shadows – subtler on dark */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.6);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.6);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.6);
+}

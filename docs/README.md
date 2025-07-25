@@ -1,6 +1,6 @@
 # 🎙️ Speakr Documentation
 
-> [!NOTE]
+> [!NOTE what]
 > **Speakr** is a privacy-first, hot-key–driven dictation utility that turns your speech into
 > typed text entirely on-device. No cloud, no latency, no compromises.
 

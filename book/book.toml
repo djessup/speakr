@@ -10,13 +10,14 @@ build-dir = "build"
 
 [output.html]
 theme = "theme"
-default-theme = "light" # ayu
-preferred-dark-theme = "dark"
+default-theme = "ayu"
+preferred-dark-theme = "ayu"
 git-repository-url = "https://github.com/djessup/speakr"
 additional-css = [
     "./mdbook-admonish.css",
     "theme/css/custom-vars.css",
     "theme/css/custom-styles.css",
+    "theme/css/custom-dark.css",
 ]
 additional-js = [
     "mermaid.min.js",
