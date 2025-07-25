@@ -9,6 +9,8 @@
     "tauri-apps.tauri-vscode",
     "swellaby.vscode-rust-test-adapter",
     "dustypomerleau.rust-syntax",
-    "vadimcn.vscode-lldb"
+    "vadimcn.vscode-lldb",
+    "yzhang.markdown-all-in-one",
+    "davidanson.vscode-markdownlint"
   ]
 }

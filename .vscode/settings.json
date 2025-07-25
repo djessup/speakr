@@ -7,12 +7,33 @@
   "todo-tree.tree.disableCompactFolders": true,
   "todo-tree.tree.showCountsInTree": true,
   "cSpell.words": [
+    "cachix",
+    "chrono",
+    "cleanup",
+    "clippy",
+    "devenv",
+    "enigo",
     "filesize",
     "ggerganov",
     "ggml",
+    "GGUF",
+    "haspopup",
     "hexdigit",
     "huggingface",
+    "kiro",
+    "Leptos",
+    "mdbook",
+    "nixpkgs",
+    "pagetoc",
+    "println",
+    "rustdoc",
     "speakr",
-    "thiserror"
-  ]
+    "tauri",
+    "thiserror",
+    "unregisters",
+    "unregistration",
+    "vars"
+  ],
+  "kiroAgent.configureMCP": "Enabled",
+  "cSpell.language": "en-GB"
 }

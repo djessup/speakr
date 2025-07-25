@@ -1,6 +1,6 @@
 Inspect the codebase, documentation, specifications and critically assess the degree of completion
 of the following requirement based on it's actual state of implementation.  Distrust documentation
-when determinng _state_ of functionality or level of completion, unless you locate supporting
+when determining _state_ of functionality or level of completion, unless you locate supporting
 evidence in the codebase. Think deeply about the evidence collected, the requirement purpose and
 role in the overall system, what/who interacts with it and how, then assess its real state of
 functionality in code.

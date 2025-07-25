@@ -231,7 +231,7 @@ use tauri::{AppHandle, Manager};
 ```rust
 /// Brief one-line description of what the function does.
 ///
-/// More detailed explanation if needed, including behavior,
+/// More detailed explanation if needed, including behaviour,
 /// side effects, and important implementation details.
 ///
 /// # Arguments
@@ -299,7 +299,7 @@ For each file, ensure:
 
 - [ ] **File-level documentation**: Module-level rustdoc comment explaining purpose and contents
 - [ ] **Function documentation**: All public functions have comprehensive rustdoc
-  - [ ] Purpose and behavior description
+  - [ ] Purpose and behaviour description
   - [ ] Parameters documented with `# Arguments`
   - [ ] Return values documented with `# Returns`
   - [ ] Error conditions documented with `# Errors`
