@@ -1,4 +1,6 @@
-//! Debug types and data structures.
+// ============================================================================
+//! Debug Types & Data Structures
+// ============================================================================
 
 use serde::{Deserialize, Serialize};
 use speakr_core::audio::AudioRecorder;

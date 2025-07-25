@@ -1,8 +1,25 @@
-/// Model metadata updater for automating whisper.cpp model information extraction
-///
-/// This module provides tools to automatically extract model metadata from the
-/// Hugging Face whisper.cpp repository and update the models.rs file with
-/// current SHA checksums, file sizes, and git references.
+// ============================================================================
+//! Model Metadata Updater
+//!
+//! Utilities that **clone** the upstream `whisper.cpp` repository, parse the
+//! model artefacts inside, and return a strongly-typed `ModelMetadata` record
+//! for each file.  At the moment the implementation is intentionally **minimal
+//! and synchronous** – just enough to satisfy unit-tests – but the public API
+//! is future-proofed so that we can add *parallel downloads*, *streamed LFS
+//! fetching*, etc. without breaking consumers.
+//!
+//! Major responsibilities:
+//! 1. Clone the repo with *Git LFS* disabled (`GIT_LFS_SKIP_SMUDGE=1`) so that
+//!    we only pull the **pointers** – not the multi-gigabyte model binaries.
+//! 2. Walk the repository tree and extract for each `ggml-<model>.bin` file:
+//!    • File size (parsed from the LFS pointer).
+//!    • SHA-1 checksum.
+//!    • Git reference (commit SHA) for provenance.
+//!
+//! The resulting metadata is consumed by build-scripts as well as the
+//! `ModelListUpdater` CLI so that end-users always see the **latest** model
+//! catalogue without having to update the application.
+// ============================================================================
 use std::{fs, path::PathBuf, process::Command};
 use thiserror::Error;
 

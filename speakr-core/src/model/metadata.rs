@@ -1,4 +1,8 @@
-/// Metadata for a single model file
+// ============================================================================
+//! Model Metadata Helpers
+// ============================================================================
+
+/// Strongly-typed metadata for a single `ggml-*.bin` model artefact.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ModelMetadata {
     pub filename: String,

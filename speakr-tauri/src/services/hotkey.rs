@@ -1,4 +1,6 @@
-//! Global hotkey service implementation.
+// ============================================================================
+//! Global Hotkey Service
+// ============================================================================
 
 use speakr_types::{HotkeyConfig, HotkeyError};
 use std::sync::{Arc, Mutex};

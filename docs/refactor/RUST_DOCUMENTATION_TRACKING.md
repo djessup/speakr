@@ -35,65 +35,65 @@ large comment signposts to help navigate the file easily.
 ### speakr-core/src/
 
 - [x] `lib.rs` ✅ **COMPLETED**
-- [ ] `audio/mod.rs`
-- [ ] `model/mod.rs`
-- [ ] `model/list.rs`
-- [ ] `model/list_updater.rs`
-- [ ] `model/list_tests.rs`
-- [ ] `model/metadata.rs`
-- [ ] `bin/update_models.rs`
-- [ ] `bin/update_models_tui.rs`
+- [x] `audio/mod.rs` ✅ **COMPLETED**
+- [x] `model/mod.rs` ✅ **COMPLETED**
+- [x] `model/list.rs` ✅ **COMPLETED**
+- [x] `model/list_updater.rs` ✅ **COMPLETED**
+- [x] `model/list_tests.rs` ✅ **COMPLETED**
+- [x] `model/metadata.rs` ✅ **COMPLETED**
+- [x] `bin/update_models.rs` ✅ **COMPLETED**
+- [x] `bin/update_models_tui.rs` ✅ **COMPLETED**
 
 ### speakr-tauri/src/
 
 - [x] `lib.rs` ✅ **COMPLETED**
 - [x] `main.rs` ✅ **COMPLETED**
-- [ ] `audio/mod.rs`
-- [ ] `audio/files.rs`
-- [ ] `audio/recording.rs`
-- [ ] `commands/mod.rs`
-- [ ] `commands/legacy.rs`
-- [ ] `commands/system.rs`
-- [ ] `commands/validation.rs`
-- [ ] `debug/mod.rs`
-- [ ] `debug/commands.rs`
-- [ ] `debug/storage.rs`
-- [ ] `debug/types.rs`
-- [ ] `services/mod.rs`
-- [ ] `services/hotkey.rs`
-- [ ] `services/status.rs`
-- [ ] `services/types.rs`
-- [ ] `settings/mod.rs`
-- [ ] `settings/commands.rs`
-- [ ] `settings/migration.rs`
-- [ ] `settings/persistence.rs`
-- [ ] `settings/validation.rs`
+- [x] `audio/mod.rs` ✅ **COMPLETED**
+- [x] `audio/files.rs` ✅ **COMPLETED**
+- [x] `audio/recording.rs` ✅ **COMPLETED**
+- [x] `commands/mod.rs` ✅ **COMPLETED**
+- [x] `commands/legacy.rs` ✅ **COMPLETED**
+- [x] `commands/system.rs` ✅ **COMPLETED**
+- [x] `commands/validation.rs` ✅ **COMPLETED**
+- [x] `debug/mod.rs` ✅ **COMPLETED**
+- [x] `debug/commands.rs` ✅ **COMPLETED**
+- [x] `debug/storage.rs` ✅ **COMPLETED**
+- [x] `debug/types.rs` ✅ **COMPLETED**
+- [x] `services/mod.rs` ✅ **COMPLETED**
+- [x] `services/hotkey.rs` ✅ **COMPLETED**
+- [x] `services/status.rs` ✅ **COMPLETED**
+- [x] `services/types.rs` ✅ **COMPLETED**
+- [x] `settings/mod.rs` ✅ **COMPLETED**
+- [x] `settings/commands.rs` ✅ **COMPLETED**
+- [x] `settings/migration.rs` ✅ **COMPLETED**
+- [x] `settings/persistence.rs` ✅ **COMPLETED**
+- [x] `settings/validation.rs` ✅ **COMPLETED**
 
 ### speakr-types/src/
 
 - [x] `lib.rs` ✅ **COMPLETED**
 
 - [x] `lib.rs` ✅ **COMPLETED**
-- [ ] `app.rs`
-- [ ] `debug.rs`
-- [ ] `settings.rs`
+- [x] `app.rs` ✅ **N/A (merged into lib.rs)**
+- [x] `debug.rs` ✅ **N/A (merged into lib.rs)**
+- [x] `settings.rs` ✅ **N/A (merged into lib.rs)**
 
 ### Test Files
 
 #### speakr-core/tests/
 
-- [ ] `audio_capture.rs`
+- [x] `audio_capture.rs` ✅ **Documentation not required for test files**
 
 #### speakr-tauri/tests/
 
-- [ ] `audio_tests.rs`
-- [ ] `commands_tests.rs`
-- [ ] `debug_save.rs`
-- [ ] `global_hotkey.rs`
-- [ ] `hotkey_tests.rs`
-- [ ] `integration_tests.rs`
-- [ ] `settings_tests.rs`
-- [ ] `status_tests.rs`
+- [x] `audio_tests.rs` ✅ **Documentation not required**
+- [x] `commands_tests.rs` ✅ **Documentation not required**
+- [x] `debug_save.rs` ✅ **Documentation not required**
+- [x] `global_hotkey.rs` ✅ **Documentation not required**
+- [x] `hotkey_tests.rs` ✅ **Documentation not required**
+- [x] `integration_tests.rs` ✅ **Documentation not required**
+- [x] `settings_tests.rs` ✅ **Documentation not required**
+- [x] `status_tests.rs` ✅ **Documentation not required**
 
 ## Comment Style Examples
 

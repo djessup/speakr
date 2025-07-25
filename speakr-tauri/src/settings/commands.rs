@@ -1,4 +1,6 @@
-//! Internal implementations for settings Tauri commands.
+// ============================================================================
+//! Settings Commands – Internal Implementations
+// ============================================================================
 
 use crate::settings::persistence::{
     get_settings_path, load_settings_from_dir, save_settings_to_dir,

@@ -1,47 +1,96 @@
-//! Audio file operations and WAV file utilities.
+// ============================================================================
+//! Audio File Helpers (`audio::files`)
+//!
+//! This module provides a minimal set of helper utilities for working with
+//! audio files inside the **Speakr** Tauri application.  The helpers focus on
+//! WAV-formatted *16-bit, mono, 16 kHz* files which are the preferred format
+//! for downstream speech-recognition services used by Speakr.
+//!
+//! The public API purposely remains very small and is **only** intended for
+//! *internal* use by the surrounding `audio` sub-crate and tests.  No item in
+//! this module is currently exposed to the JavaScript layer through Tauri
+//! commands.
+//!
+//! # Provided Functionality
+//! 1. `generate_audio_filename_with_timestamp` – Creates a unique, timestamped
+//!    filename suitable for recordings.
+//! 2. `save_audio_samples_to_wav_file` – Persists an in-memory slice of `i16`
+//!    samples to an on-disk WAV file using the optimal recording spec.
+// ============================================================================
 
+// =========================
+// External Imports
+// =========================
 use hound::{WavSpec, WavWriter};
 use speakr_types::AppError;
 use std::path::PathBuf;
 
-/// Generates an audio filename with current timestamp
+// ============================================================================
+// Filename Utilities
+// ============================================================================
+
+// --------------------------------------------------------------------------
+/// Generate a filename for a new audio recording.
+///
+/// The filename is built from the current UTC timestamp with millisecond
+/// precision so that multiple recordings in the same second never collide.
+/// The resulting string follows the pattern:
+///
+/// ```text
+/// recording_YYYY-MM-DD_HH-MM-SS.mmm.wav
+/// ```
 ///
 /// # Returns
+/// A `String` containing the formatted filename **without** any directory
+/// component – callers are expected to prepend their desired output path.
 ///
-/// A filename string in the format "recording_YYYY-MM-DD_HH-MM-SS.wav"
+/// # Examples
+/// ```ignore
+/// use crate::generate_audio_filename_with_timestamp;
+/// let fname = generate_audio_filename_with_timestamp();
+/// assert!(fname.starts_with("recording_"));
+/// assert!(fname.ends_with(".wav"));
+/// ```
 ///
 /// # Internal API
-/// This function is only intended for internal use and testing.
+/// This helper is kept pub(crate) to allow sharing across the `audio` module
+/// and its tests – it **must not** be exposed to the frontend.
 pub fn generate_audio_filename_with_timestamp() -> String {
     let now = chrono::Utc::now();
     format!("recording_{}.wav", now.format("%Y-%m-%d_%H-%M-%S%.3f"))
 }
 
-/// Saves audio samples to a WAV file
+// ============================================================================
+// WAV Persistence Helpers
+// ============================================================================
+
+// --------------------------------------------------------------------------
+/// Persist raw PCM samples (`i16`) to a 16-bit mono WAV file on disk.
 ///
 /// # Arguments
-///
-/// * `samples` - The audio samples to save (16-bit mono)
-/// * `output_path` - The path where the WAV file should be saved
+/// * `samples`      – The in-memory audio samples to write.
+/// * `output_path`  – Full filesystem path (including filename) where the WAV
+///   file should be created.
 ///
 /// # Returns
-///
-/// Returns `Ok(())` on success.
+/// `Ok(())` on success.
 ///
 /// # Errors
-///
-/// Returns `AppError` if the file cannot be written.
+/// Returns an `AppError::FileSystem` if:
+/// * The parent directory does not exist.
+/// * The file cannot be created or written to.
+/// * Finalising the WAV writer fails.
 ///
 /// # WAV Configuration
-///
-/// The WAV file is configured with:
-/// - Channels: 1 (Mono)
-/// - Sample rate: 16,000 Hz (16 kHz)
-/// - Bits per sample: 16-bit
-/// - Sample format: Signed integer
+/// The produced file always adheres to the following audio spec:
+/// * **Channels**: 1 (mono)
+/// * **Sample rate**: 16 kHz
+/// * **Bit depth**: 16-bit signed integers
 ///
 /// # Internal API
-/// This function is only intended for internal use and testing.
+/// Just like `generate_audio_filename_with_timestamp`, this function is
+/// intended for *internal* consumption only and is not wired up to any Tauri
+/// command.
 pub async fn save_audio_samples_to_wav_file(
     samples: &[i16],
     output_path: &PathBuf,
@@ -80,3 +129,7 @@ pub async fn save_audio_samples_to_wav_file(
 
     Ok(())
 }
+
+// ===========================================================================
+// End of File
+// ===========================================================================

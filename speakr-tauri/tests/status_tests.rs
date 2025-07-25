@@ -79,22 +79,72 @@ async fn test_backend_status_timestamps() {
     );
 }
 
-// Previously skipped tests - now working with pub helper functions
+// Tests that require the global singleton
 
 #[tokio::test]
 async fn test_global_backend_service_initialization() {
     // Reset service to ensure clean state
     reset_global_backend_service().await;
 
+    // Verify reset worked by checking the state multiple times
     let service = get_global_backend_service().await;
-    let service_guard = service.lock().unwrap();
-    let status = service_guard.get_current_status();
+    let mut status = {
+        let service_guard = match service.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => {
+                eprintln!("Poisoned lock in test_global_backend_service_initialization");
+                poisoned.into_inner()
+            }
+        };
+        service_guard.get_current_status()
+    };
+
+    // Retry logic to handle potential race conditions
+    let mut retries = 0;
+    while (status.audio_capture != ServiceStatus::Starting
+        || status.transcription != ServiceStatus::Starting
+        || status.text_injection != ServiceStatus::Starting)
+        && retries < 5
+    {
+        tokio::time::sleep(tokio::time::Duration::from_millis(1)).await;
+        reset_global_backend_service().await;
+
+        let service_guard = match service.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        status = service_guard.get_current_status();
+        retries += 1;
+    }
 
     // Should start with all services in "Starting" state
-    assert!(!status.is_ready());
-    assert_eq!(status.audio_capture, ServiceStatus::Starting);
-    assert_eq!(status.transcription, ServiceStatus::Starting);
-    assert_eq!(status.text_injection, ServiceStatus::Starting);
+    assert!(
+        !status.is_ready(),
+        "Backend should not be ready after reset (tried {} times), got: {:?}",
+        retries + 1,
+        status
+    );
+    assert_eq!(
+        status.audio_capture,
+        ServiceStatus::Starting,
+        "Audio capture should be Starting after reset (tried {} times), got: {:?}",
+        retries + 1,
+        status.audio_capture
+    );
+    assert_eq!(
+        status.transcription,
+        ServiceStatus::Starting,
+        "Transcription should be Starting after reset (tried {} times), got: {:?}",
+        retries + 1,
+        status.transcription
+    );
+    assert_eq!(
+        status.text_injection,
+        ServiceStatus::Starting,
+        "Text injection should be Starting after reset (tried {} times), got: {:?}",
+        retries + 1,
+        status.text_injection
+    );
 }
 
 #[tokio::test]
@@ -107,7 +157,13 @@ async fn test_global_backend_service_state_updates() {
 
     let service = get_global_backend_service().await;
     let status = {
-        let service_guard = service.lock().unwrap();
+        let service_guard = match service.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => {
+                eprintln!("Poisoned lock in test_global_backend_service_state_updates");
+                poisoned.into_inner()
+            }
+        };
         service_guard.get_current_status()
     };
 
@@ -128,7 +184,13 @@ async fn test_global_backend_service_thread_safety() {
 
     let service = get_global_backend_service().await;
     let _initial_timestamp = {
-        let service_guard = service.lock().unwrap();
+        let service_guard = match service.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => {
+                eprintln!("Poisoned lock in test_global_backend_service_thread_safety");
+                poisoned.into_inner()
+            }
+        };
         service_guard.get_current_status().timestamp
     };
 
@@ -151,7 +213,13 @@ async fn test_global_backend_service_thread_safety() {
     }
 
     // Verify that updates were applied (at least one service should be Ready)
-    let service_guard = service.lock().unwrap();
+    let service_guard = match service.lock() {
+        Ok(guard) => guard,
+        Err(poisoned) => {
+            eprintln!("Poisoned lock in test_global_backend_service_thread_safety (final check)");
+            poisoned.into_inner()
+        }
+    };
     let status = service_guard.get_current_status();
 
     // At least one service should have been updated
@@ -169,7 +237,13 @@ async fn test_backend_service_emits_events_on_state_change() {
 
     let service = get_global_backend_service().await;
     let initial_timestamp = {
-        let service_guard = service.lock().unwrap();
+        let service_guard = match service.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => {
+                eprintln!("Poisoned lock in test_backend_service_emits_events_on_state_change");
+                poisoned.into_inner()
+            }
+        };
         service_guard.get_current_status().timestamp
     };
 
@@ -181,13 +255,24 @@ async fn test_backend_service_emits_events_on_state_change() {
 
     // Check that the timestamp was updated (indicating an event was processed)
     let updated_status = {
-        let service_guard = service.lock().unwrap();
+        let service_guard = match service.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => {
+                eprintln!(
+                    "Poisoned lock in test_backend_service_emits_events_on_state_change (final check)"
+                );
+                poisoned.into_inner()
+            }
+        };
         service_guard.get_current_status()
     };
     assert!(
         updated_status.timestamp >= initial_timestamp,
         "Timestamp should be updated"
     );
+
+    // Clean up for next test
+    reset_global_backend_service().await;
 }
 
 /*

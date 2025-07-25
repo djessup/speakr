@@ -1,4 +1,6 @@
-//! Debug functionality module.
+// ============================================================================
+//! Debug Utilities – Module Root
+// ============================================================================
 //!
 //! This module provides debugging utilities for the Speakr application,
 //! including log message storage, audio recording test commands, and

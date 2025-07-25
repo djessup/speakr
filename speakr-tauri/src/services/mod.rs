@@ -1,4 +1,6 @@
-//! Services module for managing backend service components.
+// ============================================================================
+//! Service Layer – Module Root
+// ============================================================================
 //!
 //! This module contains service implementations for:
 //! - **Global hotkey management** - Handles system-wide keyboard shortcuts

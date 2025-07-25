@@ -1,4 +1,6 @@
-//! Debug message storage and management.
+// ============================================================================
+//! Debug Message Storage & Recording State
+// ============================================================================
 
 use crate::debug::types::{DebugLogLevel, DebugLogMessage, DebugRecordingState};
 use std::collections::VecDeque;

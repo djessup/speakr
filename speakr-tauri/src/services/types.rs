@@ -1,4 +1,6 @@
-//! Service types and enums.
+// ============================================================================
+//! Service Types & Enums
+// ============================================================================
 
 /// Enum to identify different service components
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]

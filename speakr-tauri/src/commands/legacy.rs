@@ -1,14 +1,42 @@
-//! Legacy compatibility commands for Speakr Tauri backend.
+// ============================================================================
+//! Legacy Compatibility Commands
+// ============================================================================
 //!
-//! This module contains commands maintained for backward compatibility
-//! with existing frontend code. These commands may be deprecated in
-//! future versions as functionality is consolidated.
+//! This module provides **shim** implementations that keep historical
+//! frontend code working while the Speakr backend APIs continue to
+//! evolve. The functionality here should be considered **deprecated**
+//! and will be removed once the migration to the new command set is
+//! complete.
+//!
+//! # Provided Functionality
+//! • `greet_internal` – Synchronous helper that returns a greeting string.
+//!   Useful only for verifying the Tauri invoke bridge during development.
+//! • `register_hot_key_internal` – Validates (but does **not** register)
+//!   a global hot-key.  Real registration happens on the frontend; new
+//!   code should call `register_global_hotkey` instead.
+//!
+//! # Deprecation Notice
+//! These commands are maintained strictly for **backwards compatibility**.
+//! Do **not** build new features that depend on them.
+
+// ============================================================================
+// External Imports
+// ============================================================================
 
 use speakr_types::AppError;
 use tracing::{debug, warn};
 
+// ============================================================================
+// Internal Imports
+// ============================================================================
+
 use crate::commands::validation::validate_hot_key_internal;
 
+// ============================================================================
+// Legacy Command Implementations
+// ============================================================================
+
+// --------------------------------------------------------------------------
 /// Simple greeting command for testing Tauri communication.
 ///
 /// # Arguments
@@ -37,6 +65,7 @@ pub fn greet_internal(name: &str) -> String {
     format!("Hello, {name}! You've been greeted from Rust!")
 }
 
+// --------------------------------------------------------------------------
 /// Registers a global hot-key with the system (legacy interface).
 ///
 /// # Arguments
@@ -154,3 +183,5 @@ mod tests {
         }
     }
 }
+
+// ============================================================================

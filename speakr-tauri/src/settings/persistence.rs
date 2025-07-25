@@ -1,4 +1,6 @@
-//! Settings persistence and file I/O operations.
+// ============================================================================
+//! Settings Persistence & File I/O
+// ============================================================================
 
 use crate::settings::{
     migration::migrate_settings, validation::validate_settings_directory_permissions,

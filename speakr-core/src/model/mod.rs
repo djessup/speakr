@@ -1,20 +1,28 @@
+// ============================================================================
+//! Model Abstractions & Utilities
 //!
-//! Model module
+//! This *umbrella* module groups together everything related to **model
+//! management** inside *Speakr* – that is model **metadata**, the canonical
+//! **model list**, and the convenience helpers that keep that list up-to-date.
 //!
-//! This module provides the model types and functionality for the Speakr application.
+//! Sub-modules:
+//! - `metadata` – `ModelMetadata` plus filename ↔︎ enum helpers
+//! - `list`   – `Model` enum with a variant for every officially supported
+//!   model
+//! - `list_updater` – fetch and merge the latest model index at runtime
 //!
-//! It includes the following submodules:
+//! In the public API we re-export the most commonly used items so that callers
+//! can simply `use speakr_core::model::*` without having to care about the
+//! internal file layout.
 //!
-//! - `metadata`: Model metadata types
-//! - `list`: Model list types
-//! - `list_updater`: updater functions for refreshing the model list
-//!
-//! # Examples
-//!
-//! ```rust
+//! # Quick Example
+//! ```no_run
 //! use speakr_core::model::Model;
-//! println!("{}", Model::LargeV3TurboQuantizedQ8_0.url());
+//!
+//! let url = Model::LargeV3TurboQuantizedQ8_0.url();
+//! println!("Download from: {url}");
 //! ```
+// ============================================================================
 
 mod list;
 mod list_updater;

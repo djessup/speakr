@@ -1,4 +1,6 @@
-//! Command management module for Speakr Tauri backend.
+// ============================================================================
+//! Tauri Command Management
+// ============================================================================
 //!
 //! This module organises all Tauri commands by functional domain:
 //! - `validation` - Input validation commands
@@ -39,6 +41,24 @@
 //! }
 //! ```
 
+// =========================
+// Module Declarations
+// =========================
+
+/// Backward-compatibility command implementations that will be removed in a
+/// future major release. Keep additions here minimal and prefer creating new
+/// commands in their own dedicated modules.
 pub mod legacy;
+
+/// Commands that interact with the underlying operating system, for example
+/// reading the file-system or configuring auto-launch settings.
 pub mod system;
+
+/// Pure validation helpers that perform synchronous checks and return
+/// structured `AppError`s without touching the outside world. These helpers
+/// are units of business-logic and can be reused from e.g. settings services.
 pub mod validation;
+
+// ============================================================================
+// End of File
+// ============================================================================

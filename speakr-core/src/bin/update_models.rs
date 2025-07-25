@@ -1,11 +1,22 @@
-/// CLI tool to update models/list.rs with latest metadata from Hugging Face
-///
-/// This tool automates the process of:
-/// 1. Clone the whisper.cpp repository without LFS files
-/// 2. Extract metadata (SHA256, size, git ref) from LFS pointer files
-/// 3. Generate updated Rust code for models/list.rs
-///
-/// Usage: cargo run --bin update-models [--repo <owner/repo>] [--workspace-dir <dir>] [--output <file>]
+// ============================================================================
+//! `update_models` – CLI helper
+//!
+//! A tiny *one-off* utility that regenerates `src/model/list.rs` from the
+//! authoritative `whisper.cpp` repository hosted on HuggingFace.  The tool
+//! never ships to end-users – it is strictly for **maintainers** – and is
+//! therefore excluded from the production build.
+//!
+//! High-level workflow:
+//! 1. Clone the repo with LFS smudge disabled (pointer files only).
+//! 2. Parse each pointer and extract size/SHA/filename.
+//! 3. Spit out ready-to-paste Rust code that updates the `Model` enum.
+//!
+//! ```bash
+//! cargo run --bin update-models -- --repo ggerganov/whisper.cpp \
+//!     --workspace-dir /tmp/whisper-cache \
+//!     --output /tmp/updated_list.rs
+//! ```
+// ============================================================================
 use std::fs;
 use std::path::PathBuf;
 

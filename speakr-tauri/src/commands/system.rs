@@ -1,4 +1,6 @@
-//! System integration commands for Speakr Tauri backend.
+// ============================================================================
+//! System Integration Commands
+// ============================================================================
 //!
 //! This module provides commands for system-level functionality including
 //! model file availability checking and auto-launch management.

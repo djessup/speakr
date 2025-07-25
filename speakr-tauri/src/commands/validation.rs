@@ -1,4 +1,6 @@
-//! Input validation commands for Speakr Tauri backend.
+// ============================================================================
+//! Input Validation Commands
+// ============================================================================
 //!
 //! This module provides validation functions for user input, particularly
 //! for hotkey format validation and input sanitisation.

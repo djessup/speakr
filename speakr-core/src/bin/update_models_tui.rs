@@ -1,12 +1,20 @@
-/// TUI version of the model metadata extraction tool
-///
-/// This provides a more interactive and visually appealing interface for updating
-/// model metadata compared to the CLI version. Uses structured logging with tracing
-/// and minimal emoji usage, preferring styled text and colors.
-///
-/// The TUI application follows a state-driven architecture where the UI renders
-/// based on the current application state, providing real-time feedback during
-/// the model processing workflow.
+// ============================================================================
+//! `update_models_tui` – Interactive TUI front-end
+//!
+//! A fancy **terminal user interface** built with *ratatui* that wraps the plain
+//! `update_models` CLI described in the sister file.  Instead of dumping log
+//! lines to stdout it renders progress bars, status sections and scrollable
+//! logs – all in real-time.
+//!
+//! The code intentionally avoids off-the-shelf “spinner emoji storms”.  We rely
+//! on colours, Unicode box-drawing characters and minimal emoji usage so that
+//! the output stays readable on monochrome terminals and in CI logs.
+//!
+//! Architecture overview:
+//! - **AppState** – central state container (simple struct, no global mutables!)
+//! - **Step** – enum representing the finite-state-machine of the workflow
+//! - `run()` loop – drives both *background tasks* and *UI rendering*
+// ============================================================================
 use std::fs;
 use std::path::PathBuf;
 

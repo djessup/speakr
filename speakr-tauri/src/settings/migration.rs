@@ -1,4 +1,6 @@
-//! Settings migration logic for handling version upgrades.
+// ============================================================================
+//! Settings Migration Logic
+// ============================================================================
 
 use speakr_types::AppSettings;
 use tracing::warn;

@@ -1,4 +1,6 @@
-//! Settings management module
+// ============================================================================
+//! Settings Management – Module Root
+// ============================================================================
 //!
 //! This module handles all settings-related functionality including:
 //! - File I/O operations and persistence

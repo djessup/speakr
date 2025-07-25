@@ -1,4 +1,6 @@
-//! Backend status service implementation.
+// ============================================================================
+//! Backend Status Service
+// ============================================================================
 
 use crate::services::types::ServiceComponent;
 use speakr_types::{AppError, BackendStatus, ServiceStatus, StatusUpdate};
@@ -140,9 +142,15 @@ pub async fn update_service_status_internal(
 #[cfg(any(test, debug_assertions))]
 pub async fn reset_global_backend_service() {
     let service = Arc::clone(&GLOBAL_BACKEND_SERVICE);
-    let mut service_guard = match service.lock() {
-        Ok(guard) => guard,
-        Err(poisoned) => poisoned.into_inner(),
-    };
-    *service_guard = BackendStatusService::new();
+    {
+        let mut service_guard = match service.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        *service_guard = BackendStatusService::new();
+    } // Drop the mutex guard here before await
+
+    // Add a small delay to ensure the reset is fully processed
+    // before other operations access the global state
+    tokio::time::sleep(tokio::time::Duration::from_millis(1)).await;
 }

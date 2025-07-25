@@ -1,4 +1,6 @@
-//! Debug command implementations.
+// ============================================================================
+//! Debug Command Implementations
+// ============================================================================
 //!
 //! This module contains the internal implementations of debug Tauri commands
 //! for audio recording tests, log management, and debug panel functionality.

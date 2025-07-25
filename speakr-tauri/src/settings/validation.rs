@@ -1,4 +1,6 @@
-//! Settings directory validation and permissions checking.
+// ============================================================================
+//! Settings Directory Validation
+// ============================================================================
 
 use speakr_types::AppError;
 use std::path::Path;

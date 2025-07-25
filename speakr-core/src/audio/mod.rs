@@ -1,12 +1,35 @@
-//! Audio capture implementation for Speakr.
+// ============================================================================
+//! Audio Capture & Recording Utilities
 //!
-//! This module provides audio recording functionality that meets Whisper's requirements:
-//! - 16 kHz sample rate
-//! - Mono audio (1 channel)
-//! - 16-bit samples
-//! - In-memory buffering only (no disk writes)
-//! - Configurable duration limits (1-30 seconds)
+//! This module provides the low-level microphone access that powers the speech
+//! recognition pipeline.  All recording is performed completely **in-memory**
+//! – no temporary files are written to disk – and the produced samples match
+//! the constraints enforced by [Whisper](https://github.com/openai/whisper):
+//!
+//! - 16 kHz sample-rate (Whisper’s required sampling frequency)
+//! - 1 channel (mono)
+//! - 16-bit signed integer samples
+//! - Hard duration limit (configurable, 1–30 seconds)
+//!
+//! The public surface exposed by this module is intentionally small so that it
+//! can be mocked from **unit-tests** and swapped out for alternative
+//! implementations in the future (e.g. a **browser** or **mobile** recorder).
+//!
+//! # High-Level Structure
+//!
+//! 1. **Constants** – Sample-rate, channels, etc.
+//! 2. **Data Structures** – `AudioDevice`, `RecordingConfig`, …
+//! 3. **Traits** – `AudioSystem` and `AudioStream` abstractions
+//! 4. **`cpal` Implementations** – Concrete implementations backed by the
+//!    `cpal` crate (`CpalAudioSystem`, `CpalAudioStream`)
+//! 5. **Recorder** – User-facing `AudioRecorder` that orchestrates lifecycle
+//!    and timeout management.
+//!
+// ============================================================================
 
+// =========================
+// External Imports
+// =========================
 use cpal::{
     traits::{DeviceTrait, HostTrait, StreamTrait},
     SampleFormat, StreamConfig,
@@ -21,6 +44,10 @@ use std::{
 use thiserror::Error;
 use tokio::sync::oneshot;
 use tracing::{debug, error, info, instrument, warn};
+
+// ============================================================================
+// Constants
+// ============================================================================
 
 /// Target sample rate (Hz) required by Whisper.
 pub const SAMPLE_RATE_HZ: u32 = 16_000;
