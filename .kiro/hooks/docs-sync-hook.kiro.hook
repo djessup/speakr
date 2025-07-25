@@ -1,0 +1,26 @@
+{
+  "enabled": true,
+  "name": "Documentation Sync",
+  "description": "Monitors all Rust source files, configuration files, and other relevant project files for changes and triggers documentation updates in README.md and the docs/ folder",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      "**/*.rs",
+      "Cargo.toml",
+      "Cargo.lock",
+      "tauri.conf.json",
+      "devenv.nix",
+      "devenv.yaml",
+      "rust-toolchain.toml",
+      ".rustfmt.toml",
+      "README.md",
+      "DEVELOPMENT.md",
+      "**/*.md"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Source files have been modified in this Rust/Tauri project. Please review the changes and update the documentation accordingly. Focus on:\n\n1. Update the main README.md if core functionality, architecture, or usage has changed\n2. Update relevant files in the docs/ folder, particularly:\n   - docs/ARCHITECTURE.md for structural changes\n   - docs/DEVELOPMENT_OVERVIEW.md for development process changes\n   - docs/SYSTEM_DESCRIPTION.md for system behavior changes\n   - Any spec files in docs/specs/ if features have been modified\n\nConsider the project structure with speakr-core/, speakr-tauri/, speakr-ui/, and speakr-types/ crates. Ensure documentation reflects current implementation and maintains consistency with the privacy-first, offline-only nature of this dictation utility."
+  }
+}
