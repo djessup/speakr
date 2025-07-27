@@ -98,7 +98,7 @@ in
       fzf # Fuzzy finder
       pre-commit # Pre-commit hooks
       markdownlint-cli # Markdown linter
-      # direnv # Directory-based environments
+
     ]
     ++ lib.optionals pkgs.stdenv.isDarwin [
       # macOS-specific libraries
