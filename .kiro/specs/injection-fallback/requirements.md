@@ -2,24 +2,31 @@
 
 ## Introduction
 
-The Injection Fallback feature provides a clipboard-based alternative when direct text injection fails or is blocked by secure input fields. The system detects when synthetic keystrokes cannot be delivered and automatically falls back to clipboard paste operations while preserving user data and providing appropriate feedback. This ensures universal compatibility across all macOS applications, including those with enhanced security measures.
+The Injection Fallback feature provides a clipboard-based alternative when direct text injection
+fails or is blocked by secure input fields. The system detects when synthetic keystrokes cannot be
+delivered and automatically falls back to clipboard paste operations while preserving user data and
+providing appropriate feedback. This ensures universal compatibility across all macOS applications,
+including those with enhanced security measures.
 
 ## Requirements
 
 ### Requirement 1
 
-**User Story:** As a user, I want dictation to work in secure text fields, so that I can use voice input even when applications block synthetic keystrokes.
+**User Story:** As a user, I want dictation to work in secure text fields, so that I can use voice
+input even when applications block synthetic keystrokes.
 
 #### Acceptance Criteria
 
 1. WHEN text injection fails due to security restrictions THEN the system SHALL detect the failure
-2. WHEN a secure text field is detected THEN the system SHALL automatically switch to clipboard fallback
+2. WHEN a secure text field is detected THEN the system SHALL automatically switch to clipboard
+   fallback
 3. WHEN clipboard fallback is used THEN it SHALL achieve 100% success rate in secure fields
 4. WHEN fallback occurs THEN the user SHALL be notified that clipboard was used
 
 ### Requirement 2
 
-**User Story:** As a user, I want my existing clipboard contents preserved, so that fallback operations don't interfere with my workflow.
+**User Story:** As a user, I want my existing clipboard contents preserved, so that fallback
+operations don't interfere with my workflow.
 
 #### Acceptance Criteria
 
@@ -30,18 +37,21 @@ The Injection Fallback feature provides a clipboard-based alternative when direc
 
 ### Requirement 3
 
-**User Story:** As a user, I want clear feedback when fallback is used, so that I understand why the behavior is different from normal injection.
+**User Story:** As a user, I want clear feedback when fallback is used, so that I understand why the
+behavior is different from normal injection.
 
 #### Acceptance Criteria
 
 1. WHEN clipboard fallback is triggered THEN a warning overlay SHALL be displayed
-2. WHEN the overlay appears THEN it SHALL show the message "Secure field detected – text pasted via clipboard"
+2. WHEN the overlay appears THEN it SHALL show the message "Secure field detected – text pasted via
+   clipboard"
 3. WHEN the overlay is shown THEN it SHALL disappear automatically after 3 seconds
 4. WHEN fallback occurs THEN the event SHALL be logged for debugging purposes
 
 ### Requirement 4
 
-**User Story:** As a developer, I want reliable detection of injection failures, so that fallback is triggered appropriately without false positives.
+**User Story:** As a developer, I want reliable detection of injection failures, so that fallback is
+triggered appropriately without false positives.
 
 #### Acceptance Criteria
 
@@ -52,7 +62,8 @@ The Injection Fallback feature provides a clipboard-based alternative when direc
 
 ### Requirement 5
 
-**User Story:** As a user, I want fallback to work seamlessly with the clipboard paste operation, so that text appears correctly in the target application.
+**User Story:** As a user, I want fallback to work seamlessly with the clipboard paste operation, so
+that text appears correctly in the target application.
 
 #### Acceptance Criteria
 
@@ -63,11 +74,13 @@ The Injection Fallback feature provides a clipboard-based alternative when direc
 
 ### Requirement 6
 
-**User Story:** As a security-conscious user, I want assurance that sensitive data is handled properly during fallback operations.
+**User Story:** As a security-conscious user, I want assurance that sensitive data is handled
+properly during fallback operations.
 
 #### Acceptance Criteria
 
-1. WHEN sensitive text is processed THEN it SHALL only remain on clipboard for the minimum necessary time
+1. WHEN sensitive text is processed THEN it SHALL only remain on clipboard for the minimum necessary
+   time
 2. WHEN clipboard restoration occurs THEN all traces of the transcript SHALL be removed
 3. WHEN fallback completes THEN no sensitive data SHALL be logged or persisted
 4. WHEN errors occur during fallback THEN sensitive content SHALL still be properly cleaned up

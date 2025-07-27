@@ -202,7 +202,7 @@ impl GlobalHotkeyService {
 ### Unit Tests
 
 1. **Hotkey Parsing**: Test various hotkey string formats and edge cases
-2. **Conflict Detection**: Mock conflict scenarios and validate fallback behavior
+2. **Conflict Detection**: Mock conflict scenarios and validate fallback behaviour
 3. **Event Emission**: Verify correct event payloads and timing
 4. **State Management**: Test thread-safe access to hotkey state
 

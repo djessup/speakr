@@ -2,11 +2,16 @@
 
 ## Overview
 
-The Injection Fallback feature provides a clipboard-based alternative when direct text injection fails or is blocked by secure input fields. The system automatically detects injection failures and seamlessly switches to clipboard paste operations while preserving user data and providing appropriate feedback. The design emphasizes security, user experience, and reliable fallback detection to ensure universal compatibility across all macOS applications.
+The Injection Fallback feature provides a clipboard-based alternative when direct text injection
+fails or is blocked by secure input fields. The system automatically detects injection failures and
+seamlessly switches to clipboard paste operations while preserving user data and providing
+appropriate feedback. The design emphasizes security, user experience, and reliable fallback
+detection to ensure universal compatibility across all macOS applications.
 
 ## Architecture
 
-The injection fallback system integrates with the existing text injection pipeline to provide seamless fallback capabilities:
+The injection fallback system integrates with the existing text injection pipeline to provide
+seamless fallback capabilities:
 
 - **FallbackDetector**: Monitors injection operations and detects failure conditions
 - **ClipboardManager**: Handles clipboard operations with proper data preservation
@@ -23,26 +28,26 @@ graph TB
         EI[EnigoInjector]
         IF[InjectionFailed]
     end
-    
+
     subgraph "Fallback System"
         FD[FallbackDetector]
         CM[ClipboardManager]
         PE[PasteExecutor]
         SM[SecurityManager]
     end
-    
+
     subgraph "User Feedback"
         NS[NotificationSystem]
         WO[Warning Overlay]
         LOG[Event Logging]
     end
-    
+
     subgraph "System Integration"
         CB[System Clipboard]
         KS[Keyboard Simulation]
         TA[Target Application]
     end
-    
+
     TIS --> EI
     EI --> IF
     IF --> FD
@@ -64,12 +69,14 @@ graph TB
 **Location**: `speakr-core/src/injection/fallback/detector.rs`
 
 **Responsibilities**:
+
 - Monitor text injection operations for failure conditions
 - Detect secure text fields and accessibility restrictions
 - Trigger fallback operations when injection fails
 - Provide failure analysis and logging
 
 **Key Methods**:
+
 ```rust
 impl FallbackDetector {
     pub fn new() -> Self
@@ -84,12 +91,14 @@ impl FallbackDetector {
 **Location**: `speakr-core/src/injection/fallback/clipboard.rs`
 
 **Responsibilities**:
+
 - Save and restore clipboard contents
 - Copy transcript text to clipboard
 - Manage clipboard data lifecycle and cleanup
 - Handle clipboard access permissions
 
 **Key Methods**:
+
 ```rust
 impl ClipboardManager {
     pub fn new() -> Result<Self, ClipboardError>
@@ -105,12 +114,14 @@ impl ClipboardManager {
 **Location**: `speakr-core/src/injection/fallback/paste.rs`
 
 **Responsibilities**:
+
 - Execute ⌘V paste commands
 - Handle paste operation timing and verification
 - Provide paste success/failure feedback
 - Integrate with macOS keyboard simulation APIs
 
 **Key Methods**:
+
 ```rust
 impl PasteExecutor {
     pub fn new() -> Result<Self, PasteError>
@@ -176,19 +187,19 @@ pub enum ClipboardFormat {
 pub enum FallbackError {
     #[error("Clipboard access denied")]
     ClipboardAccessDenied,
-    
+
     #[error("Failed to save clipboard: {0}")]
     ClipboardSaveFailed(String),
-    
+
     #[error("Failed to restore clipboard: {0}")]
     ClipboardRestoreFailed(String),
-    
+
     #[error("Paste operation failed: {0}")]
     PasteFailed(String),
-    
+
     #[error("Paste verification timeout")]
     PasteVerificationTimeout,
-    
+
     #[error("Security cleanup failed: {0}")]
     SecurityCleanupFailed(String),
 }
@@ -199,11 +210,13 @@ pub enum FallbackError {
 ### Injection Failure Detection
 
 1. **Enigo Errors**: Direct errors from the enigo crate
+
    - Detect permission denied errors
    - Handle device access failures
    - Identify secure field restrictions
 
 2. **Timeout Detection**: When injection takes too long
+
    - Monitor injection operation duration
    - Trigger fallback after configurable timeout
    - Log timeout conditions for analysis
@@ -216,6 +229,7 @@ pub enum FallbackError {
 ### Clipboard Operation Failures
 
 1. **Clipboard Access Issues**: When clipboard cannot be accessed
+
    - Handle permission denied errors
    - Provide fallback error messages
    - Log clipboard access failures
@@ -228,6 +242,7 @@ pub enum FallbackError {
 ### Paste Operation Failures
 
 1. **Paste Command Failures**: When ⌘V simulation fails
+
    - Retry paste operation with different timing
    - Detect application-specific paste issues
    - Provide alternative paste methods
@@ -249,18 +264,18 @@ impl SecurityManager {
     ) -> Result<T, ClipboardError> {
         // Save current clipboard
         let backup = self.clipboard.save_current_clipboard().await?;
-        
+
         // Perform operation
         let result = operation();
-        
+
         // Always restore clipboard, even on error
         if let Err(e) = self.clipboard.restore_clipboard(backup).await {
             error!("Failed to restore clipboard after secure operation: {}", e);
         }
-        
+
         // Clear any sensitive data
         self.clipboard.clear_clipboard().await?;
-        
+
         result
     }
 }
@@ -282,19 +297,19 @@ impl ClipboardManager {
     async fn optimized_clipboard_cycle(&self, text: &str) -> Result<(), ClipboardError> {
         // Save current clipboard (fast operation)
         let backup = self.save_current_clipboard().await?;
-        
+
         // Copy text (minimize time on clipboard)
         self.copy_text(text).await?;
-        
+
         // Execute paste immediately
         self.paste_executor.execute_paste().await?;
-        
+
         // Restore original clipboard quickly
         tokio::time::timeout(
             Duration::from_millis(500),
             self.restore_clipboard(backup)
         ).await??;
-        
+
         Ok(())
     }
 }
@@ -342,7 +357,7 @@ pub async fn notify_fallback_used(
     fallback_reason: &str,
 ) -> Result<(), NotificationError> {
     let message = "Secure field detected – text pasted via clipboard";
-    
+
     notification_service.show_overlay(OverlayConfig {
         message: message.to_string(),
         duration: Duration::from_secs(3),

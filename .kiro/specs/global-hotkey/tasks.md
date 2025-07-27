@@ -4,12 +4,17 @@
 
 The global hotkey system has been largely implemented with the following key components:
 
+### Complete
+
 - ✅ **Core Service**: `GlobalHotkeyService` with registration/unregistration
 - ✅ **Event Emission**: Hotkey triggers emit `hotkey-triggered` events
 - ✅ **Tauri Commands**: `register_global_hotkey` and `unregister_global_hotkey`
 - ✅ **Startup Integration**: Default hotkey registration with fallback
 - ✅ **Validation**: Basic hotkey format validation
 - ✅ **Testing**: Comprehensive validation tests
+
+### Incomplete
+
 - ❌ **Event Handling**: No listener for `hotkey-triggered` events
 - ❌ **Settings Integration**: Hardcoded defaults, no user settings loading
 - ❌ **Runtime Updates**: No UI integration for changing hotkeys
