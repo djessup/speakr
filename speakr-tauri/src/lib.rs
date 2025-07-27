@@ -25,31 +25,25 @@ pub mod workflow;
 // =========================
 use commands::{
     legacy::register_hot_key_internal,
-    system::{ check_model_availability_internal, set_auto_launch_internal },
+    system::{check_model_availability_internal, set_auto_launch_internal},
     validation::validate_hot_key_internal,
 };
 #[cfg(debug_assertions)]
 use debug::{
-    add_debug_log,
-    debug_clear_log_messages_internal,
-    debug_get_log_messages_internal,
-    debug_start_recording_internal,
-    debug_stop_recording_internal,
-    debug_test_audio_recording_internal,
-    DebugLogLevel,
-    DebugLogMessage,
+    add_debug_log, debug_clear_log_messages_internal, debug_get_log_messages_internal,
+    debug_start_recording_internal, debug_stop_recording_internal,
+    debug_test_audio_recording_internal, DebugLogLevel, DebugLogMessage,
 };
 use services::{
     get_backend_status_internal,
-    hotkey::{ register_global_hotkey_internal, unregister_global_hotkey_internal },
-    update_service_status_internal,
-    ServiceComponent,
+    hotkey::{register_global_hotkey_internal, unregister_global_hotkey_internal},
+    update_service_status_internal, ServiceComponent,
 };
-use settings::{ load_settings_internal, save_settings_internal };
-use speakr_types::{ AppError, AppSettings, HotkeyConfig, ServiceStatus, StatusUpdate };
-use tauri::{ App, AppHandle, Listener, Manager };
-use tracing::{ error, info, warn };
-use tracing_subscriber::fmt::{ self, fmt };
+use settings::{load_settings_internal, save_settings_internal};
+use speakr_types::{AppError, AppSettings, HotkeyConfig, ServiceStatus, StatusUpdate};
+use tauri::{App, AppHandle, Listener, Manager};
+use tracing::{error, info, warn};
+use tracing_subscriber::fmt::fmt;
 use tracing_subscriber::EnvFilter;
 use workflow::execute_dictation_workflow;
 
@@ -254,7 +248,7 @@ async fn get_backend_status() -> Result<StatusUpdate, AppError> {
 #[tauri::command]
 async fn update_service_status(
     component: ServiceComponent,
-    status: ServiceStatus
+    status: ServiceStatus,
 ) -> Result<(), AppError> {
     update_service_status_internal(component, status).await
 }
@@ -265,28 +259,19 @@ async fn update_service_status(
 
 // Helper to centralise application setup logic
 fn setup_app(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
-    // Debug logging (only in debug builds)
-    // #[cfg(debug_assertions)]
-    // init_debug_logging();
-
     info!("Speakr backend starting up...");
 
     #[cfg(desktop)]
     {
         use tauri_plugin_global_shortcut::{
-            Code,
-            GlobalShortcutExt,
-            Modifiers,
-            Shortcut,
-            ShortcutState,
+            Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState,
         };
 
         let ctrl_n_shortcut = Shortcut::new(Some(Modifiers::CONTROL), Code::KeyN);
         app.handle().plugin(
-            tauri_plugin_global_shortcut::Builder
-                ::new()
+            tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(move |_app, shortcut, event| {
-                    println!("{:?}", shortcut);
+                    println!("{shortcut:?}");
                     if shortcut == &ctrl_n_shortcut {
                         match event.state() {
                             ShortcutState::Pressed => {
@@ -298,7 +283,7 @@ fn setup_app(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
                         }
                     }
                 })
-                .build()
+                .build(),
         )?;
 
         app.global_shortcut().register(ctrl_n_shortcut)?;
@@ -313,12 +298,6 @@ fn setup_app(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-// Debug-only helper to emit a startup log message
-#[cfg(debug_assertions)]
-fn init_debug_logging() {
-    add_debug_log(DebugLogLevel::Info, "speakr-tauri", "Application starting in debug mode");
-}
-
 // Sets up the event listener for the "hotkey-triggered" event
 fn setup_hotkey_trigger_listener(app: &App) {
     let app_handle_for_listener = app.app_handle().clone();
@@ -331,7 +310,7 @@ fn setup_hotkey_trigger_listener(app: &App) {
             add_debug_log(
                 DebugLogLevel::Info,
                 "workflow",
-                "Hotkey triggered, starting dictation workflow"
+                "Hotkey triggered, starting dictation workflow",
             );
 
             if let Err(e) = execute_dictation_workflow(app_handle.clone()).await {
@@ -341,7 +320,7 @@ fn setup_hotkey_trigger_listener(app: &App) {
                 add_debug_log(
                     DebugLogLevel::Error,
                     "workflow",
-                    &format!("Dictation workflow failed: {}", e)
+                    &format!("Dictation workflow failed: {e}"),
                 );
             }
         });
@@ -370,13 +349,13 @@ async fn register_default_hotkey(app_handle: AppHandle) {
     //     &format!("Registering default hotkey: {}", default_config.shortcut)
     // );
 
-    if
-        let Err(e) = register_global_hotkey_internal(
-            app_handle.clone(),
-            default_config.clone()
-        ).await
+    if let Err(e) =
+        register_global_hotkey_internal(app_handle.clone(), default_config.clone()).await
     {
-        error!("⚠️  Failed to register default hotkey '{}': {}", default_config.shortcut, e);
+        error!(
+            "⚠️  Failed to register default hotkey '{}': {}",
+            default_config.shortcut, e
+        );
         // #[cfg(debug_assertions)]
         // add_debug_log(
         //     DebugLogLevel::Error,
@@ -391,8 +370,12 @@ async fn register_default_hotkey(app_handle: AppHandle) {
             enabled: true,
         };
 
-        if let Err(e2) = register_global_hotkey_internal(app_handle, fallback_config.clone()).await {
-            error!("⚠️  Fallback hotkey '{}' also failed: {}", fallback_config.shortcut, e2);
+        if let Err(e2) = register_global_hotkey_internal(app_handle, fallback_config.clone()).await
+        {
+            error!(
+                "⚠️  Fallback hotkey '{}' also failed: {}",
+                fallback_config.shortcut, e2
+            );
             // #[cfg(debug_assertions)]
             // add_debug_log(
             //     DebugLogLevel::Error,
@@ -415,7 +398,7 @@ async fn register_default_hotkey(app_handle: AppHandle) {
         add_debug_log(
             DebugLogLevel::Info,
             "speakr-tauri",
-            &format!("Default hotkey registered: {}", default_config.shortcut)
+            &format!("Default hotkey registered: {}", default_config.shortcut),
         );
     }
 }
@@ -426,7 +409,7 @@ async fn register_default_hotkey(app_handle: AppHandle) {
 /// and performs initial setup (including default hotkey registration).
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let mut builder = tauri::Builder::default();
+    let builder = tauri::Builder::default();
 
     // // Enable instrumentation in development builds
     // #[cfg(debug_assertions)]

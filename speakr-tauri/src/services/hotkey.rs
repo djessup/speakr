@@ -52,7 +52,7 @@ impl GlobalHotkeyService {
             return Ok(());
         }
 
-        // 🟢 GREEN: Use Tauri's native shortcut parsing instead of custom implementation
+        // Use Tauri's native shortcut parsing
         let shortcut = config.shortcut.parse::<Shortcut>().map_err(|e| {
             HotkeyError::RegistrationFailed(format!("Invalid shortcut format: {e}"))
         })?;

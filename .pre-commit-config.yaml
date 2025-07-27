@@ -6,31 +6,18 @@ repos:
   # Rust-specific hooks (local) - optimized for affected packages
   - repo: local
     hooks:
-      # Apply formatting and linting fixes to all files
-      - id: cargo-fmt-fix
-        name: cargo fmt
-        entry: cargo fmt --
-        language: system
-        files: ^.*\.rs$
-
-      - id: cargo-clippy-fix
-        name: cargo clippy fix
-        entry: cargo clippy --all-features --fix --allow-dirty --allow-staged -- -D warnings
-        language: system
-        files: ^.*\.rs$
-        pass_filenames: false
 
       # Core package hooks (only run when speakr-core files change)
       - id: cargo-fmt-core
         name: Cargo Format (speakr-core)
-        entry: cargo fmt --package speakr-core --check
+        entry: cargo fmt --package speakr-core
         language: system
         files: ^speakr-core/.*\.rs$
         pass_filenames: false
 
       - id: cargo-clippy-core
         name: Cargo Clippy (speakr-core)
-        entry: cargo clippy --package speakr-core --all-targets --all-features -- -D warnings
+        entry: cargo clippy --package speakr-core --all-targets --all-features --fix --allow-dirty --allow-staged -- -D warnings
         language: system
         files: ^speakr-core/.*\.rs$
         pass_filenames: false
@@ -45,14 +32,15 @@ repos:
       # Tauri package hooks (only run when speakr-tauri files change)
       - id: cargo-fmt-tauri
         name: Cargo Format (speakr-tauri)
-        entry: cargo fmt --package speakr-tauri --check
+        entry: cargo fmt --package speakr-tauri
         language: system
         files: ^speakr-tauri/.*\.rs$
         pass_filenames: false
 
+
       - id: cargo-clippy-tauri
         name: Cargo Clippy (speakr-tauri)
-        entry: cargo clippy --package speakr-tauri --all-targets --all-features -- -D warnings
+        entry: cargo clippy --package speakr-tauri --all-targets --all-features --fix --allow-dirty --allow-staged -- -D warnings
         language: system
         files: ^speakr-tauri/.*\.rs$
         pass_filenames: false
@@ -67,14 +55,14 @@ repos:
       # UI package hooks (only run when speakr-ui files change)
       - id: cargo-fmt-ui
         name: Cargo Format (speakr-ui)
-        entry: cargo fmt --package speakr-ui --check
+        entry: cargo fmt --package speakr-ui
         language: system
         files: ^speakr-ui/.*\.rs$
         pass_filenames: false
 
       - id: cargo-clippy-ui
         name: Cargo Clippy (speakr-ui)
-        entry: cargo clippy --package speakr-ui --all-targets --all-features -- -D warnings
+        entry: cargo clippy --package speakr-ui --all-targets --all-features --fix --allow-dirty --allow-staged -- -D warnings
         language: system
         files: ^speakr-ui/.*\.rs$
         pass_filenames: false
@@ -89,14 +77,14 @@ repos:
       # Workspace-wide hooks (run when workspace files change)
       - id: cargo-fmt-workspace
         name: Cargo Format (workspace files)
-        entry: cargo fmt --all --check
+        entry: cargo fmt --all
         language: system
         files: ^(Cargo\.(toml|lock)|\.cargo/.*)$
         pass_filenames: false
 
       - id: cargo-clippy-workspace
         name: Cargo Clippy (workspace check)
-        entry: cargo clippy --workspace --all-targets --all-features -- -D warnings
+        entry: cargo clippy --workspace --all-targets --all-features --fix --allow-dirty --allow-staged -- -D warnings
         language: system
         files: ^(Cargo\.(toml|lock)|\.cargo/.*)$
         pass_filenames: false

@@ -20,6 +20,7 @@
     "core:app:allow-version",
     "core:event:allow-emit",
     "core:event:allow-listen",
-    "store:default"
+    "store:default",
+    "global-shortcut:default"
   ]
 }

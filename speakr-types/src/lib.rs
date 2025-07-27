@@ -101,6 +101,18 @@ pub enum AppError {
     /// General command execution errors from Tauri commands.
     #[error("Command error: {0}")]
     Command(String),
+
+    /// Audio capture errors including device access and recording failures.
+    #[error("Audio capture error: {0}")]
+    AudioCapture(String),
+
+    /// Transcription errors including model loading and processing failures.
+    #[error("Transcription error: {0}")]
+    Transcription(String),
+
+    /// Text injection errors including permission and injection failures.
+    #[error("Text injection error: {0}")]
+    TextInjection(String),
 }
 
 // --------------------------------------------------------------------------
