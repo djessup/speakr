@@ -105,9 +105,9 @@ repos:
         args: ["--unsafe"] # Allow custom YAML tags
 
       - id: check-added-large-files
-
         args: ["--maxkb=1000"]
         exclude: docs/theme/mermaid.min.js
+        exclude_types: [binary]
 
       - id: check-merge-conflict
 
