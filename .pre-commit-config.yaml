@@ -6,6 +6,20 @@ repos:
   # Rust-specific hooks (local) - optimized for affected packages
   - repo: local
     hooks:
+      # Apply formatting and linting fixes to all files
+      - id: cargo-fmt-fix
+        name: cargo fmt
+        entry: cargo fmt --
+        language: system
+        files: ^.*\.rs$
+
+      - id: cargo-clippy-fix
+        name: cargo clippy fix
+        entry: cargo clippy --all-features --fix --allow-dirty --allow-staged -- -D warnings
+        language: system
+        files: ^.*\.rs$
+        pass_filenames: false
+
       # Core package hooks (only run when speakr-core files change)
       - id: cargo-fmt-core
         name: Cargo Format (speakr-core)
