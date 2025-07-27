@@ -13,6 +13,7 @@
     "clippy",
     "devenv",
     "enigo",
+    "fallbacks",
     "filesize",
     "ggerganov",
     "ggml",
@@ -23,6 +24,7 @@
     "kiro",
     "Leptos",
     "mdbook",
+    "millis",
     "nixpkgs",
     "pagetoc",
     "println",
@@ -32,6 +34,7 @@
     "thiserror",
     "unregisters",
     "unregistration",
+    "usize",
     "vars"
   ],
   "kiroAgent.configureMCP": "Enabled",
