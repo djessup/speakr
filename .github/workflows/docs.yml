@@ -30,6 +30,9 @@ jobs:
       MDBOOK_VERSION: 0.4.52
 
     steps:
+      - name: Setup devenv
+        uses: ./.github/workflows/setup-devenv/action.yml
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
