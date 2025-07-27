@@ -7,11 +7,11 @@
 //! - Settings persistence via Tauri commands and local storage
 //!
 //! All settings management follows Tauri v2 plugin architecture with
-//! @tauri-apps/plugin-global-shortcut for hot-key functionality.
+//! tauri-plugin-global-shortcut for hot-key functionality.
 
 use leptos::prelude::*;
-use serde::{ Deserialize, Serialize };
-use speakr_types::{ AppSettings, ModelSize };
+use serde::{Deserialize, Serialize};
+use speakr_types::{AppSettings, ModelSize};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 
@@ -25,11 +25,10 @@ extern "C" {
 /// Helper function to invoke Tauri commands
 async fn tauri_invoke<T: for<'de> Deserialize<'de>, U: Serialize>(
     cmd: &str,
-    args: &U
+    args: &U,
 ) -> Result<T, String> {
-    let js_args = serde_wasm_bindgen
-        ::to_value(args)
-        .map_err(|e| format!("Failed to serialize args: {e}"))?;
+    let js_args =
+        serde_wasm_bindgen::to_value(args).map_err(|e| format!("Failed to serialize args: {e}"))?;
 
     let result = invoke(cmd, js_args).await;
 
@@ -54,29 +53,29 @@ pub struct SettingsManager;
 impl SettingsManager {
     /// Loads settings from the backend
     pub async fn load() -> Result<AppSettings, SettingsError> {
-        tauri_invoke_no_args("load_settings").await.map_err(|e|
-            format!("Failed to load settings: {e}")
-        )
+        tauri_invoke_no_args("load_settings")
+            .await
+            .map_err(|e| format!("Failed to load settings: {e}"))
     }
 
     /// Saves settings to the backend
     pub async fn save(settings: &AppSettings) -> Result<(), SettingsError> {
         web_sys::console::log_1(&"🔧 SettingsManager::save called".into());
         web_sys::console::log_1(
-            &format!("📤 Invoking Tauri command 'save_settings' with: {settings:?}").into()
+            &format!("📤 Invoking Tauri command 'save_settings' with: {settings:?}").into(),
         );
 
         // Pass settings directly to match the Tauri command signature
         match tauri_invoke::<(), _>("save_settings", settings).await {
             Ok(result) => {
                 web_sys::console::log_1(
-                    &"✅ Tauri command 'save_settings' returned successfully".into()
+                    &"✅ Tauri command 'save_settings' returned successfully".into(),
                 );
                 Ok(result)
             }
             Err(e) => {
                 web_sys::console::error_1(
-                    &format!("❌ Tauri command 'save_settings' failed: {e}").into()
+                    &format!("❌ Tauri command 'save_settings' failed: {e}").into(),
                 );
                 Err(format!("Failed to save settings: {e}"))
             }
@@ -96,9 +95,9 @@ impl SettingsManager {
             hot_key: hot_key.to_string(),
         };
 
-        tauri_invoke::<(), _>("validate_hot_key", &args).await.map_err(|e|
-            format!("Invalid hot-key: {e}")
-        )
+        tauri_invoke::<(), _>("validate_hot_key", &args)
+            .await
+            .map_err(|e| format!("Invalid hot-key: {e}"))
     }
 
     /// Checks model availability
@@ -140,9 +139,8 @@ pub struct GlobalShortcutManager;
 impl GlobalShortcutManager {
     /// Registers a global shortcut using the Tauri v2 plugin
     pub async fn register(shortcut: &str) -> Result<(), SettingsError> {
-        let result = js_sys::eval(
-            &format!(
-                r#"
+        let result = js_sys::eval(&format!(
+            r#"
             (async () => {{
                 try {{
                     const registerFn = (window.__TAURI__?.globalShortcut?.register) ?? null;
@@ -167,61 +165,64 @@ impl GlobalShortcutManager {
                 }}
             }})()
             "#
-            )
-        );
+        ));
 
         match result {
             Ok(promise) => {
                 let promise: js_sys::Promise = promise.into();
-                let result = wasm_bindgen_futures::JsFuture
-                    ::from(promise).await
+                let result = wasm_bindgen_futures::JsFuture::from(promise)
+                    .await
                     .map_err(|e| format!("Hot-key conflict: Failed to register shortcut: {e:?}"))?;
 
                 // Check if registration was successful
-                let success = js_sys::Reflect
-                    ::get(&result, &JsValue::from("success"))
+                let success = js_sys::Reflect::get(&result, &JsValue::from("success"))
                     .map_err(|_| "Command error: Invalid response format")?;
 
                 if success.as_bool() == Some(true) {
                     Ok(())
                 } else {
-                    let error = js_sys::Reflect
-                        ::get(&result, &JsValue::from("error"))
+                    let error = js_sys::Reflect::get(&result, &JsValue::from("error"))
                         .unwrap_or_else(|_| JsValue::from("Unknown error"));
                     Err(format!("Hot-key conflict: Registration failed: {error:?}"))
                 }
             }
-            Err(e) => Err(format!("Command error: Failed to execute registration: {e:?}")),
+            Err(e) => Err(format!(
+                "Command error: Failed to execute registration: {e:?}"
+            )),
         }
     }
 
     /// Unregisters a global shortcut
     pub async fn unregister(shortcut: &str) -> Result<(), SettingsError> {
-        let result = js_sys::eval(
-            &format!(
-                r#"
+        let result = js_sys::eval(&format!(
+            r#"
             (async () => {{
                 try {{
-                    const {{ unregister }} = await import("@tauri-apps/plugin-global-shortcut");
-                    await unregister("{shortcut}");
+                    const unregisterFn = (window.__TAURI__?.globalShortcut?.unregister) ?? null;
+                    if (unregisterFn) {{
+                        await unregisterFn("{shortcut}");
+                    }} else {{
+                        throw new Error("Global shortcut unregistration failed. window.__TAURI__.globalShortcut is not available.");
+                    }}
                     return {{ success: true }};
                 }} catch (error) {{
                     return {{ success: false, error: error.message }};
                 }}
             }})()
             "#
-            )
-        );
+        ));
 
         match result {
             Ok(promise) => {
                 let promise: js_sys::Promise = promise.into();
-                let _result = wasm_bindgen_futures::JsFuture
-                    ::from(promise).await
+                let _result = wasm_bindgen_futures::JsFuture::from(promise)
+                    .await
                     .map_err(|e| format!("Command error: Failed to unregister shortcut: {e:?}"))?;
                 Ok(())
             }
-            Err(e) => Err(format!("Command error: Failed to execute unregistration: {e:?}")),
+            Err(e) => Err(format!(
+                "Command error: Failed to execute unregistration: {e:?}"
+            )),
         }
     }
 
@@ -239,20 +240,22 @@ impl GlobalShortcutManager {
                     return { success: false, error: error.message };
                 }
             })()
-            "#
+            "#,
         );
 
         match result {
             Ok(promise) => {
                 let promise: js_sys::Promise = promise.into();
-                let _result = wasm_bindgen_futures::JsFuture
-                    ::from(promise).await
+                let _result = wasm_bindgen_futures::JsFuture::from(promise)
+                    .await
                     .map_err(|e| {
                         format!("Command error: Failed to unregister all shortcuts: {e:?}")
                     })?;
                 Ok(())
             }
-            Err(e) => Err(format!("Command error: Failed to execute unregister all: {e:?}")),
+            Err(e) => Err(format!(
+                "Command error: Failed to execute unregister all: {e:?}"
+            )),
         }
     }
 }
@@ -278,9 +281,8 @@ pub fn SettingsPanel() -> impl IntoView {
     let (hotkey_valid, set_hotkey_valid) = signal(true);
 
     // Model availability state
-    let (model_availability, set_model_availability) = signal(
-        std::collections::HashMap::<String, bool>::new()
-    );
+    let (model_availability, set_model_availability) =
+        signal(std::collections::HashMap::<String, bool>::new());
 
     // Load settings on mount
     Effect::new(move || {
@@ -302,6 +304,7 @@ pub fn SettingsPanel() -> impl IntoView {
     Effect::new(move || {
         let _current_settings = settings.get();
         spawn_local(async move {
+            // FIXME: Get model details from the backend
             let model_sizes = vec!["small", "medium", "large"];
             let mut availability = std::collections::HashMap::new();
 
@@ -344,7 +347,7 @@ pub fn SettingsPanel() -> impl IntoView {
                 Err(e) => {
                     let error_msg = format!("Failed to save settings: {e}");
                     web_sys::console::error_1(
-                        &format!("❌ Backend save failed: {error_msg}").into()
+                        &format!("❌ Backend save failed: {error_msg}").into(),
                     );
                     set_error_message.set(Some(error_msg));
                     set_success_message.set(None);
@@ -398,17 +401,18 @@ pub fn SettingsPanel() -> impl IntoView {
                             set_temp_hotkey.set(String::new());
                             set_hotkey_valid.set(true);
 
-                            match SettingsManager::save(&settings.get()).await {
+                            // Use `get_untracked` to access the signal value outside of a reactive
+                            // context and pass it directly to the `save` function.
+                            match SettingsManager::save(&settings.get_untracked()).await {
                                 Ok(_) => {
-                                    set_success_message.set(
-                                        Some("Hot-key updated successfully!".to_string())
-                                    );
+                                    set_success_message
+                                        .set(Some("Hot-key updated successfully!".to_string()));
                                     set_error_message.set(None);
                                 }
                                 Err(e) => {
-                                    set_error_message.set(
-                                        Some(format!("Hot-key registered but failed to save: {e}"))
-                                    );
+                                    set_error_message.set(Some(format!(
+                                        "Hot-key registered but failed to save: {e}"
+                                    )));
                                 }
                             }
                         }
@@ -649,9 +653,19 @@ pub fn SettingsPanel() -> impl IntoView {
 
 // Helper functions for event handling
 fn event_target_value(event: &web_sys::Event) -> String {
-    event.target().unwrap().dyn_into::<web_sys::HtmlInputElement>().unwrap().value()
+    event
+        .target()
+        .unwrap()
+        .dyn_into::<web_sys::HtmlInputElement>()
+        .unwrap()
+        .value()
 }
 
 fn event_target_checked(event: &web_sys::Event) -> bool {
-    event.target().unwrap().dyn_into::<web_sys::HtmlInputElement>().unwrap().checked()
+    event
+        .target()
+        .unwrap()
+        .dyn_into::<web_sys::HtmlInputElement>()
+        .unwrap()
+        .checked()
 }
