@@ -1,0 +1,1 @@
+- Use UK/GB English (e.g. "behaviour" instead of "behavior")
