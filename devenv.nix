@@ -54,6 +54,8 @@ in
       enable = true;
       package = pkgs.nodejs_20;
     };
+    # C++ configuration (for whisper-rs)
+    cplusplus.enable = true;
   };
 
   # Development packages
@@ -240,11 +242,11 @@ in
     docs-install-plugins = {
       description = "Install mdbook plugins";
       exec = ''
-          BOOK_DIR="''${DEVENV_ROOT}/book/"
-          pushd "''${BOOK_DIR}"
-          mdbook-admonish install .
-          mdbook-mermaid install .
-          popd
+        BOOK_DIR="''${DEVENV_ROOT}/book/"
+        pushd "''${BOOK_DIR}"
+        mdbook-admonish install .
+        mdbook-mermaid install .
+        popd
       '';
     };
 
@@ -309,6 +311,11 @@ in
     # frontend.exec = "trunk serve --port 1420";
     # frontend.ready = "curl -f http://localhost:1420";
   };
+
+  # Tests configuration: run all workspace crates' tests
+  enterTest = ''
+    cargo test --workspace --all-features
+  '';
 
   # Shell initialization
   enterShell =

@@ -18,30 +18,40 @@ pub mod commands;
 pub mod debug;
 pub mod services;
 pub mod settings;
+pub mod workflow;
 
 // =========================
 // External Imports
 // =========================
 use commands::{
-    legacy::{greet_internal, register_hot_key_internal},
-    system::{check_model_availability_internal, set_auto_launch_internal},
+    legacy::register_hot_key_internal,
+    system::{ check_model_availability_internal, set_auto_launch_internal },
     validation::validate_hot_key_internal,
 };
 #[cfg(debug_assertions)]
 use debug::{
-    add_debug_log, debug_clear_log_messages_internal, debug_get_log_messages_internal,
-    debug_start_recording_internal, debug_stop_recording_internal,
-    debug_test_audio_recording_internal, DebugLogLevel, DebugLogMessage,
+    add_debug_log,
+    debug_clear_log_messages_internal,
+    debug_get_log_messages_internal,
+    debug_start_recording_internal,
+    debug_stop_recording_internal,
+    debug_test_audio_recording_internal,
+    DebugLogLevel,
+    DebugLogMessage,
 };
 use services::{
     get_backend_status_internal,
-    hotkey::{register_global_hotkey_internal, unregister_global_hotkey_internal},
-    update_service_status_internal, ServiceComponent,
+    hotkey::{ register_global_hotkey_internal, unregister_global_hotkey_internal },
+    update_service_status_internal,
+    ServiceComponent,
 };
-use settings::{load_settings_internal, save_settings_internal};
-use speakr_types::{AppError, AppSettings, HotkeyConfig, ServiceStatus, StatusUpdate};
-use tauri::{AppHandle, Manager};
-use tracing::{error, info, warn};
+use settings::{ load_settings_internal, save_settings_internal };
+use speakr_types::{ AppError, AppSettings, HotkeyConfig, ServiceStatus, StatusUpdate };
+use tauri::{ App, AppHandle, Listener, Manager };
+use tracing::{ error, info, warn };
+use tracing_subscriber::fmt::{ self, fmt };
+use tracing_subscriber::EnvFilter;
+use workflow::execute_dictation_workflow;
 
 // ============================================================================
 // Tauri Command Definitions
@@ -217,19 +227,6 @@ async fn debug_clear_log_messages() -> Result<(), AppError> {
 }
 
 // --------------------------------------------------------------------------
-/// Simple greeting command for legacy compatibility.
-///
-/// # Arguments
-/// * `name` - The name to greet
-///
-/// # Returns
-/// Returns a greeting string.
-#[tauri::command]
-fn greet(name: &str) -> String {
-    greet_internal(name)
-}
-
-// --------------------------------------------------------------------------
 /// Gets the current backend status for the frontend.
 ///
 /// # Returns
@@ -257,7 +254,7 @@ async fn get_backend_status() -> Result<StatusUpdate, AppError> {
 #[tauri::command]
 async fn update_service_status(
     component: ServiceComponent,
-    status: ServiceStatus,
+    status: ServiceStatus
 ) -> Result<(), AppError> {
     update_service_status_internal(component, status).await
 }
@@ -266,21 +263,187 @@ async fn update_service_status(
 // Application Entry Point
 // ============================================================================
 
+// Helper to centralise application setup logic
+fn setup_app(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
+    // Debug logging (only in debug builds)
+    // #[cfg(debug_assertions)]
+    // init_debug_logging();
+
+    info!("Speakr backend starting up...");
+
+    #[cfg(desktop)]
+    {
+        use tauri_plugin_global_shortcut::{
+            Code,
+            GlobalShortcutExt,
+            Modifiers,
+            Shortcut,
+            ShortcutState,
+        };
+
+        let ctrl_n_shortcut = Shortcut::new(Some(Modifiers::CONTROL), Code::KeyN);
+        app.handle().plugin(
+            tauri_plugin_global_shortcut::Builder
+                ::new()
+                .with_handler(move |_app, shortcut, event| {
+                    println!("{:?}", shortcut);
+                    if shortcut == &ctrl_n_shortcut {
+                        match event.state() {
+                            ShortcutState::Pressed => {
+                                println!("Ctrl-N Pressed!");
+                            }
+                            ShortcutState::Released => {
+                                println!("Ctrl-N Released!");
+                            }
+                        }
+                    }
+                })
+                .build()
+        )?;
+
+        app.global_shortcut().register(ctrl_n_shortcut)?;
+    }
+
+    // Set up the hotkey-triggered listener
+    setup_hotkey_trigger_listener(app);
+
+    // Spawn task to register the default global hotkey
+    spawn_register_default_hotkey(app.app_handle().clone());
+
+    Ok(())
+}
+
+// Debug-only helper to emit a startup log message
+#[cfg(debug_assertions)]
+fn init_debug_logging() {
+    add_debug_log(DebugLogLevel::Info, "speakr-tauri", "Application starting in debug mode");
+}
+
+// Sets up the event listener for the "hotkey-triggered" event
+fn setup_hotkey_trigger_listener(app: &App) {
+    let app_handle_for_listener = app.app_handle().clone();
+    app.listen("hotkey-triggered", move |_event| {
+        let app_handle = app_handle_for_listener.clone();
+        tauri::async_runtime::spawn(async move {
+            info!("🔥 Hotkey triggered, starting dictation workflow");
+
+            #[cfg(debug_assertions)]
+            add_debug_log(
+                DebugLogLevel::Info,
+                "workflow",
+                "Hotkey triggered, starting dictation workflow"
+            );
+
+            if let Err(e) = execute_dictation_workflow(app_handle.clone()).await {
+                error!("Dictation workflow failed: {}", e);
+
+                #[cfg(debug_assertions)]
+                add_debug_log(
+                    DebugLogLevel::Error,
+                    "workflow",
+                    &format!("Dictation workflow failed: {}", e)
+                );
+            }
+        });
+    });
+}
+
+// Spawns the async task to register the default global hotkey
+fn spawn_register_default_hotkey(app_handle: AppHandle) {
+    tauri::async_runtime::spawn(async move {
+        register_default_hotkey(app_handle).await;
+    });
+}
+
+// Performs default and fallback hotkey registration
+async fn register_default_hotkey(app_handle: AppHandle) {
+    let default_config = HotkeyConfig {
+        shortcut: "CmdOrCtrl+Alt+Space".to_string(),
+        enabled: true,
+    };
+
+    info!("Registering default hotkey: {}", default_config.shortcut);
+    // #[cfg(debug_assertions)]
+    // add_debug_log(
+    //     DebugLogLevel::Info,
+    //     "speakr-tauri",
+    //     &format!("Registering default hotkey: {}", default_config.shortcut)
+    // );
+
+    if
+        let Err(e) = register_global_hotkey_internal(
+            app_handle.clone(),
+            default_config.clone()
+        ).await
+    {
+        error!("⚠️  Failed to register default hotkey '{}': {}", default_config.shortcut, e);
+        // #[cfg(debug_assertions)]
+        // add_debug_log(
+        //     DebugLogLevel::Error,
+        //     "speakr-tauri",
+        //     &format!("Failed to register default hotkey: {e}")
+        // );
+        warn!("💡 You can change the hotkey in Settings to avoid conflicts");
+
+        // Fallback hotkey
+        let fallback_config = HotkeyConfig {
+            shortcut: "CmdOrCtrl+Alt+F2".to_string(),
+            enabled: true,
+        };
+
+        if let Err(e2) = register_global_hotkey_internal(app_handle, fallback_config.clone()).await {
+            error!("⚠️  Fallback hotkey '{}' also failed: {}", fallback_config.shortcut, e2);
+            // #[cfg(debug_assertions)]
+            // add_debug_log(
+            //     DebugLogLevel::Error,
+            //     "speakr-tauri",
+            //     &format!("Fallback hotkey also failed: {e2}")
+            // );
+            warn!("App will start without global hotkey - configure one in Settings");
+        } else {
+            info!("Using fallback hotkey: {}", fallback_config.shortcut);
+            // #[cfg(debug_assertions)]
+            // add_debug_log(
+            //     DebugLogLevel::Info,
+            //     "speakr-tauri",
+            //     &format!("Using fallback hotkey: {}", fallback_config.shortcut)
+            // );
+        }
+    } else {
+        info!("Default hotkey registered: {}", default_config.shortcut);
+        #[cfg(debug_assertions)]
+        add_debug_log(
+            DebugLogLevel::Info,
+            "speakr-tauri",
+            &format!("Default hotkey registered: {}", default_config.shortcut)
+        );
+    }
+}
+
 /// Runs the Tauri application, registering all plugins and commands.
 ///
 /// This function sets up the Tauri builder, registers plugins, configures the invoke handler,
 /// and performs initial setup (including default hotkey registration).
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let mut builder = tauri::Builder::default();
+
+    // // Enable instrumentation in development builds
+    // #[cfg(debug_assertions)]
+    // {
+    //     builder = builder.plugin(tauri_plugin_devtools::init());
+    // }
+
+    // Initialise a logging subscriber that respects RUST_LOG
+    fmt().with_env_filter(EnvFilter::from_default_env()).init();
+
+    builder
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
-        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .invoke_handler({
             #[cfg(debug_assertions)]
             {
                 tauri::generate_handler![
-                    greet,
                     save_settings,
                     load_settings,
                     validate_hot_key,
@@ -301,7 +464,6 @@ pub fn run() {
             #[cfg(not(debug_assertions))]
             {
                 tauri::generate_handler![
-                    greet,
                     save_settings,
                     load_settings,
                     validate_hot_key,
@@ -315,107 +477,7 @@ pub fn run() {
                 ]
             }
         })
-        .setup(|app| {
-            // =========================
-            // Initial Setup (Debug Logging, Hotkey Registration)
-            // =========================
-            #[cfg(debug_assertions)]
-            {
-                add_debug_log(
-                    DebugLogLevel::Info,
-                    "speakr-tauri",
-                    "Application starting in debug mode",
-                );
-            }
-
-            info!("🎙️  Speakr backend starting up...");
-
-            // Set up default global hotkey
-            let app_handle = app.app_handle().clone();
-            tauri::async_runtime::spawn(async move {
-                // Default hotkey configuration
-                let default_config = HotkeyConfig {
-                    shortcut: "CmdOrCtrl+Alt+Space".to_string(),
-                    enabled: true,
-                };
-
-                info!(
-                    "⌨️  Registering default hotkey: {}",
-                    default_config.shortcut
-                );
-
-                #[cfg(debug_assertions)]
-                add_debug_log(
-                    DebugLogLevel::Info,
-                    "speakr-tauri",
-                    &format!("Registering default hotkey: {}", default_config.shortcut),
-                );
-
-                if let Err(e) =
-                    register_global_hotkey_internal(app_handle.clone(), default_config.clone())
-                        .await
-                {
-                    error!(
-                        "⚠️  Failed to register default hotkey '{}': {}",
-                        default_config.shortcut, e
-                    );
-
-                    #[cfg(debug_assertions)]
-                    add_debug_log(
-                        DebugLogLevel::Error,
-                        "speakr-tauri",
-                        &format!("Failed to register default hotkey: {e}"),
-                    );
-
-                    warn!("💡 You can change the hotkey in Settings to avoid conflicts");
-
-                    // Try a fallback hotkey if the default fails
-                    let fallback_config = HotkeyConfig {
-                        shortcut: "CmdOrCtrl+Alt+F2".to_string(),
-                        enabled: true,
-                    };
-
-                    if let Err(e2) =
-                        register_global_hotkey_internal(app_handle, fallback_config.clone()).await
-                    {
-                        error!(
-                            "⚠️  Fallback hotkey '{}' also failed: {}",
-                            fallback_config.shortcut, e2
-                        );
-
-                        #[cfg(debug_assertions)]
-                        add_debug_log(
-                            DebugLogLevel::Error,
-                            "speakr-tauri",
-                            &format!("Fallback hotkey also failed: {e2}"),
-                        );
-
-                        warn!(
-                            "🔧 App will start without global hotkey - configure one in Settings"
-                        );
-                    } else {
-                        info!("✅ Using fallback hotkey: {}", fallback_config.shortcut);
-
-                        #[cfg(debug_assertions)]
-                        add_debug_log(
-                            DebugLogLevel::Info,
-                            "speakr-tauri",
-                            &format!("Using fallback hotkey: {}", fallback_config.shortcut),
-                        );
-                    }
-                } else {
-                    info!("✅ Default hotkey registered: {}", default_config.shortcut);
-
-                    #[cfg(debug_assertions)]
-                    add_debug_log(
-                        DebugLogLevel::Info,
-                        "speakr-tauri",
-                        &format!("Default hotkey registered: {}", default_config.shortcut),
-                    );
-                }
-            });
-            Ok(())
-        })
+        .setup(move |app| setup_app(app))
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
