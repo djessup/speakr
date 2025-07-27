@@ -1,0 +1,23 @@
+name: Test
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  tests:
+    strategy:
+      matrix:
+        os: [macos-latest]
+    runs-on: "{{ '${{ matrix.os }}' }}"
+    defaults:
+      run:
+        shell: devenv shell zsh -- -e {0}
+    steps:
+      - name: Setup devenv
+        uses: ./.github/workflows/setup-devenv/action.yml
+
+      - name: Run tests
+        run: devenv test
