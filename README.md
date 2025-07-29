@@ -9,11 +9,11 @@ using Whisper models.
 ## Key Features
 
 - **Privacy-first**: All transcription happens locally - no cloud, no data collection
-- **Fast & responsive**: Real-time audio capture and transcription
-- **Universal text injection**: Works with any macOS application
+- **Fast & responsive**: Real-time audio capture with configurable duration (1-30 seconds)
+- **Universal text injection**: Works with any macOS application via synthetic keystrokes
 - **Local AI**: Uses OpenAI Whisper models (GGUF format) stored on your device
-- **Global hotkeys**: Start/stop dictation from anywhere
-- **Modern UI**: Clean, accessible interface built with Leptos
+- **Global hotkeys**: Configurable system-wide shortcuts (default: `CmdOrCtrl+Alt+F1`)
+- **Modern UI**: Clean, accessible interface built with Leptos and comprehensive settings
 
 ## Project Structure
 
@@ -79,12 +79,24 @@ Speakr follows **Test-Driven Development (TDD)**:
 2. 🟢 **GREEN**: Write minimal code to make the test pass
 3. 🔵 **REFACTOR**: Improve code quality while keeping tests green
 
+### Testing Strategy
+
+- **Unit Tests**: Individual function testing with mocked dependencies
+- **Integration Tests**: Cross-module functionality testing
+- **Workflow Tests**: End-to-end dictation pipeline validation with settings integration
+- **Settings Tests**: Configuration persistence, loading, and validation testing
+- **TDD Approach**: All features developed test-first with comprehensive coverage
+
 ### Code Quality Standards
 
 - **No `unwrap()` in production** - Use proper error handling with `Result<T, E>`
 - **Document public APIs** - Every public function needs rustdoc with examples
 - **Test isolation** - Use `tempfile::TempDir` for filesystem tests
+- **Settings integration** - All configurable behaviour loads from persistent settings
 - **Tauri commands** - Never mark `#[tauri::command]` functions as `pub`
+- **Dependency injection** - Use traits and mocking for testable code
+- **Error handling** - Comprehensive error types with meaningful messages
+- **Constants over magic numbers** - Use named constants for validation limits and defaults
 
 ## 🔐 Privacy & Security
 

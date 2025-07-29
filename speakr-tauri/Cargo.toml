@@ -43,6 +43,8 @@ tracing-subscriber = { version = "0.3", features = [
   "env-filter",
   "ansi",
 ] }
+async-trait = "0.1" # Async trait support for dependency injection
+mockall = "0.13" # Mock generation for testing (used in test_utils module)
 
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
@@ -50,5 +52,11 @@ tempfile = "3.0"                                                    # Temporary 
 tauri = { version = "2", features = ["test", "tracing"] }           # Test utilities for Tauri
 tauri-plugin-devtools = "2"
 
+futures = "0.3"                                                     # Future utilities for parallel testing
+
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-global-shortcut = "2"
+
+[profile.dev.build-override]
+codegen-units = 8
+incremental = true

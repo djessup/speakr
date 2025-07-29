@@ -9,10 +9,11 @@ use crate::debug::{
     storage::{DEBUG_LOG_MESSAGES, DEBUG_RECORDING_STATE},
     types::{DebugLogLevel, DebugLogMessage},
 };
+use crate::settings::commands::load_settings_internal;
 use speakr_core::audio::{AudioRecorder, RecordingConfig};
 use speakr_types::AppError;
 use std::{fs, path::PathBuf, time::Duration};
-use tracing::info;
+use tracing::{info, warn};
 
 /// Internal implementation for debug audio recording test
 ///
@@ -93,8 +94,24 @@ pub async fn debug_start_recording_internal() -> Result<String, AppError> {
         }
     }
 
-    // Create audio recorder with 30 second max duration (push-to-talk should be shorter)
-    let config = RecordingConfig::new(30);
+    // Load audio duration from settings, with fallback to 30 seconds for debug recording
+    let settings = load_settings_internal().await.map_err(|e| {
+        warn!(
+            "Failed to load settings for debug recording, using 30 second fallback: {}",
+            e
+        );
+        e
+    });
+
+    let duration_secs = match settings {
+        Ok(settings) => {
+            // For debug recording, use settings duration but cap at 30 seconds for safety
+            std::cmp::min(settings.audio_duration_secs, 30)
+        }
+        Err(_) => 30, // Fallback to 30 seconds if settings loading fails
+    };
+
+    let config = RecordingConfig::new(duration_secs);
     let recorder = AudioRecorder::new(config)
         .await
         .map_err(|e| AppError::Settings(format!("Failed to create audio recorder: {e}")))?;

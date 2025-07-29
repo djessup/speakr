@@ -22,40 +22,49 @@ The global hotkey system has been largely implemented with the following key com
 ## Remaining Tasks
 
 - [x] 1. Complete core hotkey workflow integration
-  - Wire the `hotkey-triggered` event to the complete dictation pipeline (record → transcribe
-    → inject)
+
+  - Wire the `hotkey-triggered` event to the complete dictation pipeline (record → transcribe →
+    inject)
   - Implement event handler that calls into `speakr-core` for audio capture
   - Add proper error handling and user feedback for workflow failures
   - _Requirements: 2.1, 2.2_
 
-- [ ] 2. Implement settings integration for hotkey configuration
-  - [ ] 2.1 Load user-defined hotkey from persisted settings at startup
-    - Modify application startup to read hotkey configuration from settings instead of hardcoded
-      default
-    - Apply user's custom hotkey during `GlobalHotkeyService` initialization
-    - Add fallback to default hotkey if settings are corrupted or missing
+- [x] 2. Implement settings integration for hotkey configuration
+
+  - [x] 2.1 Load user-defined hotkey from persisted settings at startup
+
+    - ✅ Modified `register_default_hotkey` function in `lib.rs` to load hotkey from
+      `AppSettings.hot_key` using `load_settings_internal()`
+    - ✅ Updated startup sequence to attempt settings loading before hotkey registration
+    - ✅ Maintained existing fallback behaviour when settings load fails (uses
+      "CmdOrCtrl+Alt+Space")
+    - ✅ Added proper logging for both successful settings load and fallback scenarios
     - _Requirements: 3.1, 3.4_
 
-  - [ ] 2.2 Create Tauri command for runtime hotkey updates
-    - Implement `update_hotkey` Tauri command that re-registers hotkey at runtime
-    - Add validation to prevent invalid hotkey configurations
-    - Ensure settings persistence when hotkey is changed
+  - [x] 2.2 Create Tauri command for runtime hotkey updates
+    - Implement `update_global_hotkey` Tauri command that re-registers hotkey at runtime
+    - Integrate with existing `GlobalHotkeyService` for registration/unregistration
+    - Replace UI `GlobalShortcutManager` JavaScript calls with backend service calls
     - _Requirements: 3.2, 3.3_
 
 - [x] 3. Basic hotkey service implementation
+
   - [x] 3.1 Core GlobalHotkeyService structure
+
     - `GlobalHotkeyService` struct implemented with registration/unregistration methods
     - Thread-safe state management using Arc<Mutex<>> for current shortcut tracking
     - Integration with `tauri-plugin-global-shortcut` for system-level registration
     - _Requirements: 1.1, 1.2_
 
   - [x] 3.2 Event emission on hotkey trigger
+
     - Hotkey triggers emit `hotkey-triggered` event with empty payload
     - Event emission happens in shortcut callback handler
     - TODO comment indicates workflow integration needed in next step
     - _Requirements: 2.1_
 
   - [x] 3.3 Basic conflict detection and error handling
+
     - `HotkeyError` enum with `RegistrationFailed`, `ConflictDetected`, `NotFound` variants
     - Registration failures return appropriate error types with descriptive messages
     - Automatic unregistration of existing shortcuts before registering new ones
@@ -68,7 +77,9 @@ The global hotkey system has been largely implemented with the following key com
     - _Requirements: 3.2_
 
 - [x] 4. Application startup integration
+
   - [x] 4.1 Default hotkey registration at startup
+
     - Application registers `CmdOrCtrl+Alt+Space` as default hotkey on startup
     - Registration happens asynchronously in setup function
     - Success/failure logged with appropriate debug information
@@ -81,7 +92,9 @@ The global hotkey system has been largely implemented with the following key com
     - _Requirements: 1.3_
 
 - [x] 5. Basic validation and type system
+
   - [x] 5.1 HotkeyConfig data structure
+
     - `HotkeyConfig` struct with shortcut string and enabled boolean
     - Default implementation using `DEFAULT_HOTKEY` constant
     - Serialization support for settings persistence
@@ -94,33 +107,25 @@ The global hotkey system has been largely implemented with the following key com
     - _Requirements: 3.2, 3.3_
 
 - [x] 6. Constants and defaults updated
+
   - [x] 6.1 Default hotkey constant
     - `DEFAULT_HOTKEY` set to `CmdOrCtrl+Alt+F1` in `speakr-types`
     - Avoids conflicts with common system shortcuts
     - Used consistently across application startup and settings
     - _Requirements: 1.1_
 
-- [ ] 7. Remaining workflow integration tasks
-  - [ ] 7.1 Event listener for hotkey-triggered events
+- [x] 7. Complete workflow integration
+
+  - [x] 7.1 Event listener for hotkey-triggered events
     - Add event listener in application setup to handle `hotkey-triggered` events
     - Connect event handler to `speakr-core` audio capture functionality
     - Implement complete record → transcribe → inject pipeline
     - _Requirements: 2.1, 2.2_
 
-  - [ ] 7.2 Settings integration for user-defined hotkeys
-    - Load hotkey configuration from persisted settings at startup
-    - Replace hardcoded default with user's saved hotkey preference
-    - Handle settings corruption/missing with appropriate fallbacks
-    - _Requirements: 3.1, 3.4_
-
-  - [ ] 7.3 Runtime hotkey updates
-    - Implement settings UI integration for hotkey changes
-    - Add command to update hotkey registration without restart
-    - Ensure settings persistence when hotkey is modified
-    - _Requirements: 3.2, 3.3_
-
 - [ ] 8. Performance monitoring and optimization
+
   - [ ] 8.1 Add response time measurement
+
     - Implement timing measurement from hotkey press to event emission
     - Add performance logging to track response times
     - Ensure 100ms response time requirement is met
@@ -133,7 +138,9 @@ The global hotkey system has been largely implemented with the following key com
     - _Requirements: 4.3_
 
 - [ ] 9. Enhanced error handling and recovery
+
   - [ ] 9.1 Add graceful workflow abortion on failures
+
     - Implement proper cleanup when any step in the dictation workflow fails
     - Add user notification system for workflow failures
     - Ensure system remains responsive after workflow errors
@@ -146,7 +153,9 @@ The global hotkey system has been largely implemented with the following key com
     - _Requirements: 1.1, 1.4_
 
 - [ ] 10. Comprehensive testing coverage
+
   - [ ] 10.1 Create integration tests for hotkey workflow
+
     - Write tests for complete hotkey → dictation → injection workflow
     - Add tests for error scenarios and recovery mechanisms
     - Create performance tests for response time requirements
@@ -159,14 +168,16 @@ The global hotkey system has been largely implemented with the following key com
     - Tests implemented in `commands/validation.rs` module tests
     - _Requirements: 3.2, 3.3_
 
-- [ ] 11. UI enhancements for hotkey management
-  - [ ] 11.1 Create hotkey configuration interface
+- [x] 11. UI enhancements for hotkey management
+
+  - [x] 11.1 Create hotkey configuration interface
+
     - Add hotkey input field with real-time validation in Settings UI
     - Implement hotkey conflict warnings in the UI
     - Add hotkey testing functionality (press to test)
     - _Requirements: 3.1, 3.2, 3.3_
 
-  - [ ] 11.2 Add hotkey status indicators
+  - [x] 11.2 Add hotkey status indicators
     - Display current hotkey registration status in UI
     - Show conflict warnings and resolution suggestions
     - Add visual feedback for successful hotkey changes

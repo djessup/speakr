@@ -33,7 +33,8 @@ use thiserror::Error;
 /// Default schema version for settings migration support.
 ///
 /// Used to handle backwards compatibility when settings format changes.
-pub const DEFAULT_SCHEMA_VERSION: u32 = 1;
+/// Version 2: Added audio_duration_secs field with validation
+pub const DEFAULT_SCHEMA_VERSION: u32 = 2;
 
 /// Default global hotkey combination for dictation activation.
 ///
@@ -50,6 +51,24 @@ pub const DEFAULT_MODEL_SIZE: &str = "medium";
 ///
 /// Disabled by default to respect user privacy preferences.
 pub const DEFAULT_AUTO_LAUNCH: bool = false;
+
+/// Minimum allowed audio recording duration in seconds.
+///
+/// Set to 1 second to ensure meaningful audio capture while preventing
+/// accidental zero-duration recordings.
+pub const MIN_AUDIO_DURATION_SECS: u32 = 1;
+
+/// Maximum allowed audio recording duration in seconds.
+///
+/// Set to 30 seconds to balance memory usage and practical dictation needs.
+/// Longer recordings may consume excessive memory and processing time.
+pub const MAX_AUDIO_DURATION_SECS: u32 = 30;
+
+/// Default audio recording duration in seconds.
+///
+/// Set to 10 seconds to match current behaviour while providing
+/// reasonable balance between capturing complete thoughts and memory usage.
+pub const DEFAULT_AUDIO_DURATION_SECS: u32 = 10;
 
 // ============================================================================
 // Error Types and Error Handling
@@ -208,6 +227,7 @@ impl Default for HotkeyConfig {
 /// - `hot_key`: Global hotkey combination string
 /// - `model_size`: Selected Whisper model size identifier
 /// - `auto_launch`: Whether to start with system
+/// - `audio_duration_secs`: Recording duration limit in seconds (1-30)
 ///
 /// # Examples
 ///
@@ -219,6 +239,7 @@ impl Default for HotkeyConfig {
 ///     hot_key: "CmdOrCtrl+Alt+F1".to_string(),
 ///     model_size: "medium".to_string(),
 ///     auto_launch: false,
+///     audio_duration_secs: 10,
 /// };
 /// ```
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -235,11 +256,20 @@ pub struct AppSettings {
 
     /// Whether to auto-launch the app on system startup.
     pub auto_launch: bool,
+
+    /// Audio recording duration limit in seconds (1-30 seconds).
+    #[serde(default = "default_audio_duration_secs")]
+    pub audio_duration_secs: u32,
 }
 
 /// Provides the default schema version for serde deserialization.
 fn default_schema_version() -> u32 {
     DEFAULT_SCHEMA_VERSION
+}
+
+/// Provides the default audio duration for serde deserialization.
+fn default_audio_duration_secs() -> u32 {
+    DEFAULT_AUDIO_DURATION_SECS
 }
 
 impl Default for AppSettings {
@@ -249,7 +279,62 @@ impl Default for AppSettings {
             hot_key: DEFAULT_HOTKEY.to_string(),
             model_size: DEFAULT_MODEL_SIZE.to_string(),
             auto_launch: DEFAULT_AUTO_LAUNCH,
+            audio_duration_secs: DEFAULT_AUDIO_DURATION_SECS,
         }
+    }
+}
+
+impl AppSettings {
+    /// Validates that the audio duration is within acceptable range.
+    ///
+    /// # Arguments
+    ///
+    /// * `duration_secs` - The duration in seconds to validate
+    ///
+    /// # Returns
+    ///
+    /// `true` if the duration is between 1 and 30 seconds (inclusive), `false` otherwise.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use speakr_types::AppSettings;
+    ///
+    /// assert!(AppSettings::validate_audio_duration(10));
+    /// assert!(!AppSettings::validate_audio_duration(0));
+    /// assert!(!AppSettings::validate_audio_duration(31));
+    /// ```
+    pub fn validate_audio_duration(duration_secs: u32) -> bool {
+        (MIN_AUDIO_DURATION_SECS..=MAX_AUDIO_DURATION_SECS).contains(&duration_secs)
+    }
+
+    /// Validates all fields in the AppSettings structure.
+    ///
+    /// # Returns
+    ///
+    /// `Ok(())` if all settings are valid, `Err(String)` with error message if invalid.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use speakr_types::AppSettings;
+    ///
+    /// let mut settings = AppSettings::default();
+    /// assert!(settings.validate().is_ok());
+    ///
+    /// settings.audio_duration_secs = 0;
+    /// assert!(settings.validate().is_err());
+    /// ```
+    pub fn validate(&self) -> Result<(), String> {
+        if !Self::validate_audio_duration(self.audio_duration_secs) {
+            return Err(format!(
+                "Invalid audio duration: {} seconds. Must be between {} and {} seconds.",
+                self.audio_duration_secs, MIN_AUDIO_DURATION_SECS, MAX_AUDIO_DURATION_SECS
+            ));
+        }
+
+        // Add other validation checks here as needed
+        Ok(())
     }
 }
 
@@ -693,6 +778,73 @@ mod tests {
         assert_eq!(settings.hot_key, DEFAULT_HOTKEY);
         assert_eq!(settings.model_size, DEFAULT_MODEL_SIZE);
         assert_eq!(settings.auto_launch, DEFAULT_AUTO_LAUNCH);
+        assert_eq!(settings.audio_duration_secs, DEFAULT_AUDIO_DURATION_SECS);
+    }
+
+    #[test]
+    fn test_audio_duration_validation_valid_range() {
+        assert!(AppSettings::validate_audio_duration(
+            MIN_AUDIO_DURATION_SECS
+        ));
+        assert!(AppSettings::validate_audio_duration(
+            DEFAULT_AUDIO_DURATION_SECS
+        ));
+        assert!(AppSettings::validate_audio_duration(
+            MAX_AUDIO_DURATION_SECS
+        ));
+    }
+
+    #[test]
+    fn test_audio_duration_validation_invalid_range() {
+        assert!(!AppSettings::validate_audio_duration(
+            MIN_AUDIO_DURATION_SECS - 1
+        ));
+        assert!(!AppSettings::validate_audio_duration(
+            MAX_AUDIO_DURATION_SECS + 1
+        ));
+        assert!(!AppSettings::validate_audio_duration(100));
+    }
+
+    #[test]
+    fn test_audio_duration_constants_are_consistent() {
+        assert!(MIN_AUDIO_DURATION_SECS <= DEFAULT_AUDIO_DURATION_SECS);
+        assert!(DEFAULT_AUDIO_DURATION_SECS <= MAX_AUDIO_DURATION_SECS);
+        assert!(AppSettings::validate_audio_duration(
+            DEFAULT_AUDIO_DURATION_SECS
+        ));
+    }
+
+    #[test]
+    fn test_audio_duration_validation_uses_constants() {
+        // Test that validation uses the defined constants
+        assert!(AppSettings::validate_audio_duration(
+            MIN_AUDIO_DURATION_SECS
+        ));
+        assert!(AppSettings::validate_audio_duration(
+            MAX_AUDIO_DURATION_SECS
+        ));
+        assert!(!AppSettings::validate_audio_duration(
+            MIN_AUDIO_DURATION_SECS - 1
+        ));
+        assert!(!AppSettings::validate_audio_duration(
+            MAX_AUDIO_DURATION_SECS + 1
+        ));
+    }
+
+    #[test]
+    fn test_app_settings_validate_method() {
+        // Test that AppSettings has a validate method that checks audio duration
+        let mut settings = AppSettings::default();
+        assert!(settings.validate().is_ok());
+
+        settings.audio_duration_secs = 0;
+        assert!(settings.validate().is_err());
+
+        settings.audio_duration_secs = 31;
+        assert!(settings.validate().is_err());
+
+        settings.audio_duration_secs = 15;
+        assert!(settings.validate().is_ok());
     }
 
     #[test]

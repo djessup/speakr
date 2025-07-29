@@ -1,19 +1,21 @@
 ---
-date: 2025-07-23
+date: 2025-07-27
 requirement: FR-1-global-hotkey
 status: PARTIALLY COMPLETE
 prepared_by: o3
+updated_by: kiro
 ---
 # Implementation Report: FR-1 - Global Hot-key
 
 ## Implementation Summary
 
 The backend (`speakr-tauri`) integrates **tauri-plugin-global-shortcut** to register a system-wide
-shortcut at start-up.  A default combination (`CmdOrCtrl+Alt+Space`) is attempted first; if
-registration fails (for example due to a conflict) a fallback (`CmdOrCtrl+Alt+F2`) is tried.  The
+shortcut at start-up. The hotkey configuration is now loaded from persisted settings at startup,
+with fallback to the default combination (`CmdOrCtrl+Alt+Space`) if settings loading fails. If
+registration fails (for example due to a conflict) a fallback (`CmdOrCtrl+Alt+F2`) is tried. The
 registration logic is implemented in `GlobalHotkeyService`
 (`speakr-tauri/src/services/hotkey.rs`) and invoked from `speakr-tauri/src/lib.rs` inside the
-`setup` callback.  The service stores the active shortcut behind a mutex and emits a
+`setup` callback. The service stores the active shortcut behind a mutex and emits a
 **`hotkey-triggered`** Tauri event each time the key is pressed.
 
 Validation utilities (`commands::validation::validate_hot_key_internal`) together with the
@@ -25,8 +27,8 @@ behaviour and placeholder Tauri integration scenarios.
 
 1. **Trigger pipeline** – wire the `hotkey-triggered` event to the _record → transcribe → inject_
    flow (FR-2, FR-3, FR-4).
-2. **Settings integration** – load a user-defined shortcut from persisted settings at start-up and
-   expose a Tauri command that re-registers it at runtime.
+2. **Runtime settings updates** – expose a Tauri command that re-registers the hotkey at runtime
+   when users change it in the settings UI.
 3. **Conflict feedback** – propagate `HotkeyError::ConflictDetected` to the UI so users are warned
    instantly.
 4. **Configurable modifier** – change the default shortcut to match the PRD (`⌥ Option + ~`) and

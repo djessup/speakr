@@ -11,6 +11,7 @@
 pub mod commands;
 pub mod migration;
 pub mod persistence;
+pub mod traits;
 pub mod validation;
 
 // Re-export functions needed by lib.rs and tests
@@ -20,4 +21,5 @@ pub use persistence::{
     get_settings_backup_path, get_settings_path, load_settings_from_dir, save_settings_to_dir,
     try_load_settings_file,
 };
+pub use traits::{GlobalSettingsLoader, IsolatedSettingsLoader, SettingsLoader};
 pub use validation::validate_settings_directory_permissions;

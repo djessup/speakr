@@ -2,8 +2,8 @@
 //! Settings Migration Logic
 // ============================================================================
 
-use speakr_types::AppSettings;
-use tracing::warn;
+use speakr_types::{AppSettings, DEFAULT_AUDIO_DURATION_SECS, DEFAULT_SCHEMA_VERSION};
+use tracing::{info, warn};
 
 /// Migrates settings from older versions to the current version.
 ///
@@ -17,7 +17,7 @@ use tracing::warn;
 ///
 /// # Migration Strategy
 ///
-/// - Version 0 → 1: No structural changes needed for current implementation
+/// - Version 0 or 1 → 2: Adds `audio_duration_secs` field, otherwise no structural change
 /// - Future versions will be handled incrementally
 /// - Invalid versions are reset to defaults with warning
 ///
@@ -25,16 +25,20 @@ use tracing::warn;
 /// This function is only intended for internal use and testing.
 pub fn migrate_settings(mut settings: AppSettings) -> AppSettings {
     match settings.version {
-        0 => {
-            // Migrate from version 0 to 1 - no changes needed for now
-            settings.version = 1;
+        v if v < DEFAULT_SCHEMA_VERSION => {
+            // Migrate from any version prior to 2 – add audio_duration_secs
+            info!("Migrating settings from version {v} to 2");
+            settings.audio_duration_secs = DEFAULT_AUDIO_DURATION_SECS;
+            settings.version = 2;
         }
-        1 => {
+        DEFAULT_SCHEMA_VERSION => {
             // Current version - no migration needed
         }
-        v if v > 1 => {
+        v if v > DEFAULT_SCHEMA_VERSION => {
             // Future version - log warning but don't modify
-            warn!("Warning: Settings file has newer version {v} than supported (1). Using as-is.");
+            warn!(
+                "Warning: Settings file has newer version {v} than supported ({DEFAULT_SCHEMA_VERSION}). Using as-is."
+            );
         }
         _ => {
             // Invalid version - reset to defaults
@@ -45,5 +49,12 @@ pub fn migrate_settings(mut settings: AppSettings) -> AppSettings {
             settings = AppSettings::default();
         }
     }
-    settings
+
+    match settings.validate() {
+        Ok(_) => settings,
+        Err(e) => {
+            warn!("Invalid settings after migration: {}", e);
+            AppSettings::default()
+        }
+    }
 }

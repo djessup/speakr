@@ -5,10 +5,10 @@
 use crate::settings::{
     migration::migrate_settings, validation::validate_settings_directory_permissions,
 };
-use speakr_types::{AppError, AppSettings};
+use speakr_types::{AppError, AppSettings, DEFAULT_AUDIO_DURATION_SECS};
 use std::fs;
 use std::path::PathBuf;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 /// Gets the settings file path in the app data directory.
 ///
@@ -60,8 +60,16 @@ pub fn try_load_settings_file(path: &PathBuf) -> Result<AppSettings, String> {
     let content =
         fs::read_to_string(path).map_err(|e| format!("Failed to read settings file: {e}"))?;
 
-    let settings: AppSettings = serde_json::from_str(&content)
+    let mut settings: AppSettings = serde_json::from_str(&content)
         .map_err(|e| format!("Failed to parse settings JSON: {e}"))?;
+
+    if !AppSettings::validate_audio_duration(settings.audio_duration_secs) {
+        warn!(
+            "Invalid audio duration: {}. Using default ({DEFAULT_AUDIO_DURATION_SECS}).",
+            settings.audio_duration_secs
+        );
+        settings.audio_duration_secs = DEFAULT_AUDIO_DURATION_SECS;
+    }
 
     Ok(settings)
 }
@@ -87,6 +95,9 @@ pub async fn save_settings_to_dir(
     settings: &AppSettings,
     settings_dir: &PathBuf,
 ) -> Result<(), AppError> {
+    // Validate settings before saving
+    settings.validate().map_err(AppError::Settings)?;
+
     // Ensure directory exists
     if !settings_dir.exists() {
         fs::create_dir_all(settings_dir)
@@ -96,9 +107,8 @@ pub async fn save_settings_to_dir(
     let settings_path = settings_dir.join("settings.json");
     let backup_path = settings_dir.join("settings.json.backup");
 
-    // Ensure settings have current version
-    let mut settings_to_save = settings.clone();
-    settings_to_save.version = 1;
+    // Use settings as provided (version should already be correct)
+    let settings_to_save = settings;
 
     let json = serde_json::to_string_pretty(&settings_to_save)
         .map_err(|e| AppError::Settings(format!("Failed to serialize settings: {e}")))?;

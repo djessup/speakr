@@ -13,8 +13,10 @@
 // =========================
 // External Imports
 // =========================
+use crate::settings::{GlobalSettingsLoader, SettingsLoader};
 use speakr_core::audio::{AudioRecorder, RecordingConfig};
-use speakr_types::AppError;
+use speakr_types::{AppError, AppSettings};
+use std::sync::Arc;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter};
 use tracing::{debug, error, info, instrument, warn};
@@ -38,13 +40,36 @@ use tracing::{debug, error, info, instrument, warn};
 /// Returns `AppError` if audio capture, transcription, or text injection fails.
 #[instrument(level = "info", skip(app_handle))]
 pub async fn execute_dictation_workflow(app_handle: AppHandle) -> Result<(), AppError> {
+    let loader = GlobalSettingsLoader;
+    execute_dictation_workflow_with_loader(app_handle, Arc::new(loader)).await
+}
+
+/// Executes the complete dictation workflow with custom settings loader (for testing)
+///
+/// # Arguments
+///
+/// * `app_handle` - The Tauri application handle for event emission
+/// * `loader` - The settings loader to use
+///
+/// # Returns
+///
+/// Returns `Ok(())` if the workflow completes successfully, or an error if any step fails.
+///
+/// # Errors
+///
+/// Returns `AppError` if audio capture, transcription, or text injection fails.
+#[instrument(level = "info", skip(app_handle, loader))]
+pub async fn execute_dictation_workflow_with_loader(
+    app_handle: AppHandle,
+    loader: Arc<dyn SettingsLoader>,
+) -> Result<(), AppError> {
     info!("🎙️ Starting dictation workflow");
 
     // Emit workflow start event for UI feedback
     let _ = app_handle.emit("workflow-started", ());
 
     // Step 1: Audio Capture
-    let audio_samples = match capture_audio(&app_handle).await {
+    let audio_samples = match capture_audio_with_loader(&app_handle, loader).await {
         Ok(samples) => {
             info!("✅ Audio capture completed with {} samples", samples.len());
             samples
@@ -92,6 +117,58 @@ pub async fn execute_dictation_workflow(app_handle: AppHandle) -> Result<(), App
 // Audio Capture Step
 // ============================================================================
 
+/// Creates a RecordingConfig using settings-based duration with fallback
+///
+/// # Returns
+///
+/// Returns a RecordingConfig with duration loaded from settings, or default on failure
+///
+/// # Errors
+///
+/// This function handles errors internally and always returns a valid RecordingConfig
+pub async fn create_recording_config_from_settings() -> RecordingConfig {
+    let loader = GlobalSettingsLoader;
+    create_recording_config_with_loader(Arc::new(loader)).await
+}
+
+/// Creates a RecordingConfig using a custom settings loader (for testing)
+///
+/// # Arguments
+///
+/// * `loader` - The settings loader to use
+///
+/// # Returns
+///
+/// Returns a RecordingConfig with duration loaded from settings, or default on failure
+///
+/// # Errors
+///
+/// This function handles errors internally and always returns a valid RecordingConfig
+pub async fn create_recording_config_with_loader(
+    loader: Arc<dyn SettingsLoader>,
+) -> RecordingConfig {
+    // Load audio duration from user settings
+    let settings = loader.load_settings().await.map_err(|e| {
+        warn!("Failed to load settings, using default duration: {}", e);
+        e
+    });
+
+    let duration_secs = match settings {
+        Ok(settings) => {
+            if AppSettings::validate_audio_duration(settings.audio_duration_secs) {
+                settings.audio_duration_secs
+            } else {
+                warn!("Invalid settings, using default duration");
+                speakr_types::DEFAULT_AUDIO_DURATION_SECS
+            }
+        }
+        Err(_) => speakr_types::DEFAULT_AUDIO_DURATION_SECS, // Fallback to default if settings loading fails
+    };
+
+    debug!("Using audio duration: {} seconds", duration_secs);
+    RecordingConfig::new(duration_secs)
+}
+
 /// Captures audio using speakr-core AudioRecorder
 ///
 /// # Arguments
@@ -106,16 +183,39 @@ pub async fn execute_dictation_workflow(app_handle: AppHandle) -> Result<(), App
 ///
 /// Returns `AppError` if audio capture initialization or recording fails.
 #[instrument(level = "debug", skip(app_handle))]
+#[allow(dead_code)]
 async fn capture_audio(app_handle: &AppHandle) -> Result<Vec<i16>, AppError> {
+    let loader = GlobalSettingsLoader;
+    capture_audio_with_loader(app_handle, Arc::new(loader)).await
+}
+
+/// Captures audio using speakr-core AudioRecorder with custom settings loader
+///
+/// # Arguments
+///
+/// * `app_handle` - The Tauri application handle for event emission
+/// * `loader` - The settings loader to use
+///
+/// # Returns
+///
+/// Returns the captured audio samples as Vec<i16>
+///
+/// # Errors
+///
+/// Returns `AppError` if audio capture initialization or recording fails.
+#[instrument(level = "debug", skip(app_handle, loader))]
+async fn capture_audio_with_loader(
+    app_handle: &AppHandle,
+    loader: Arc<dyn SettingsLoader>,
+) -> Result<Vec<i16>, AppError> {
     debug!("Initializing audio recorder");
 
     // Emit audio capture start event
     let _ = app_handle.emit("audio-capture-started", ());
 
-    // Create recorder with default 10-second configuration
-    // TODO: Load duration from user settings when settings integration is implemented
-    let config = RecordingConfig::new(10);
-    let recorder = AudioRecorder::new(config)
+    // Create recording config using settings-based duration
+    let config = create_recording_config_with_loader(loader).await;
+    let recorder = AudioRecorder::new(config.clone())
         .await
         .map_err(|e| AppError::AudioCapture(format!("Failed to initialize recorder: {e}")))?;
 
@@ -132,9 +232,10 @@ async fn capture_audio(app_handle: &AppHandle) -> Result<Vec<i16>, AppError> {
     // 2. Show visual feedback that recording is active
     // 3. Handle user cancellation
 
-    // For now, wait for the full duration or manual stop
-    // In practice, this would be controlled by user input
-    tokio::time::sleep(Duration::from_secs(5)).await;
+    // Wait for the recording duration specified in config
+    // TODO: In a real implementation, we would also listen for early stop signals
+    let recording_duration = Duration::from_secs(config.max_duration_secs() as u64);
+    tokio::time::sleep(recording_duration).await;
 
     // Stop recording and get samples
     let result = recorder

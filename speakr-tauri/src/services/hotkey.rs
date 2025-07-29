@@ -5,11 +5,11 @@
 use speakr_types::{HotkeyConfig, HotkeyError};
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter};
-use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
+use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 use tracing::{debug, info};
 
 /// Service responsible for managing global hot-keys
-pub(crate) struct GlobalHotkeyService {
+pub struct GlobalHotkeyService {
     app_handle: AppHandle,
     current_shortcut: Arc<Mutex<Option<String>>>,
     current_shortcut_instance: Arc<Mutex<Option<Shortcut>>>,
@@ -31,6 +31,15 @@ impl GlobalHotkeyService {
             current_shortcut: Arc::new(Mutex::new(None)),
             current_shortcut_instance: Arc::new(Mutex::new(None)),
         })
+    }
+
+    /// Determines whether the given shortcut event should trigger the
+    /// application workflow.  At the moment we are only interested in the
+    /// *Pressed* state (the initial key-down).  Filtering here prevents the
+    /// *Released* state from causing a duplicate invocation.
+    #[inline]
+    pub fn should_handle_hotkey_event(state: ShortcutState) -> bool {
+        state == ShortcutState::Pressed
     }
 
     /// Registers a global hot-key with the system
@@ -69,14 +78,19 @@ impl GlobalHotkeyService {
 
         // Register the new shortcut with the system
         let app_handle_clone = self.app_handle.clone();
+
         self.app_handle
             .global_shortcut()
-            .on_shortcut(shortcut, move |_app, _shortcut, _event| {
-                // Emit an event when the hotkey is triggered
-                let _ = app_handle_clone.emit("hotkey-triggered", ());
+            .on_shortcut(shortcut, move |_app, _shortcut, event| {
+                // Only react to the key *press* event; ignore the release to
+                // prevent duplicate workflow invocations.
+                if Self::should_handle_hotkey_event(event.state()) {
+                    // Emit an event when the hotkey is triggered
+                    let _ = app_handle_clone.emit("hotkey-triggered", ());
 
-                // TODO: Wire this to speakr-core pipeline in next step
-                debug!("Global hotkey triggered");
+                    // TODO: Wire this to speakr-core pipeline in next step
+                    debug!("Global hotkey triggered");
+                }
             })
             .map_err(|e| {
                 HotkeyError::ConflictDetected(format!("Failed to register shortcut: {e}"))
@@ -165,4 +179,55 @@ pub async fn register_global_hotkey_internal(
 pub async fn unregister_global_hotkey_internal(app_handle: AppHandle) -> Result<(), String> {
     let mut service = GlobalHotkeyService::new(app_handle).map_err(|e| e.to_string())?;
     service.unregister_hotkey().await.map_err(|e| e.to_string())
+}
+
+/// Update the global hotkey by unregistering the current one and registering a new one
+pub async fn update_global_hotkey_internal(
+    app_handle: AppHandle,
+    config: HotkeyConfig,
+) -> Result<(), String> {
+    let mut service = GlobalHotkeyService::new(app_handle).map_err(|e| e.to_string())?;
+
+    // The register_hotkey method already handles unregistering existing shortcuts
+    // so we can just call it directly
+    service
+        .register_hotkey(&config)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_should_handle_hotkey_event() {
+        assert!(GlobalHotkeyService::should_handle_hotkey_event(
+            ShortcutState::Pressed
+        ));
+    }
+
+    // ============================================================================
+    // Duplicate Invocation Regression Test
+    // ============================================================================
+
+    /// [`ShortcutState`] supplied by the `tauri_plugin_global_shortcut` callback
+    /// for *Pressed* **and** *Released* events
+    /// A single physical shortcut press should only trigger the workflow once.
+    #[test]
+    fn test_single_hotkey_press_triggers_once() {
+        // Simulate the plugin callback firing for both *Pressed* and *Released*.
+        let states = vec![ShortcutState::Pressed, ShortcutState::Released];
+
+        let workflow_invocations = states
+            .into_iter()
+            .filter(|s| GlobalHotkeyService::should_handle_hotkey_event(*s))
+            .count();
+
+        // Assert – only the *Pressed* state should be counted as a valid trigger.
+        assert_eq!(
+            workflow_invocations, 1,
+            "Exactly one workflow invocation expected on key press"
+        );
+    }
 }

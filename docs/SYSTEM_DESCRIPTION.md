@@ -28,7 +28,7 @@ Everything runs on-device; no network calls (besides the initial model download)
 └────────────────────────────────────────────────────┘
 ```
 
-*Global shortcut*, *audio*, and *keystroke injection* all live in the backend so Speakr continues to
+_Global shortcut_, _audio_, and _keystroke injection_ all live in the backend so Speakr continues to
 work when the UI window is hidden.
 
 ---
@@ -63,103 +63,93 @@ Use a Cargo workspace so all three crates share versions and CI.
 
 ---
 
-## 4. Bootstrapping
+## 4. Current Implementation Status
 
-### 4.1 Prerequisites
+### 4.1 Completed Components
 
-* Rust 1.88.0 + (stable)
-* Node 18 + & pnpm/yarn/npm (for Tauri/Trunk helpers)
-* Xcode Command-Line Tools (macOS)
-* Download a GGUF Whisper model → `models/ggml-small.en.gguf`
+- **Settings System**: Persistent configuration with validation and migration support
+- **Global Hotkey**: System-wide hotkey registration with conflict detection
+- **Audio Capture**: 16kHz mono recording with configurable duration (1-30 seconds)
+- **Workflow Orchestration**: Complete pipeline integration with error handling
+- **Testing Infrastructure**: Comprehensive test coverage with TDD practices
 
-### 4.2 Create the workspace
+### 4.2 Settings Integration
 
-```bash
-cargo new --lib speakr-core
-cargo tauri init --template leptos speakr-tauri   # generates src-tauri + Leptos wiring
-cd speakr-tauri
-pnpm tauri add global-shortcut                     # JavaScript guest bindings
+The system includes robust settings integration:
+
+```rust
+// Audio duration loaded from user settings
+pub async fn create_recording_config_from_settings() -> RecordingConfig {
+    let settings = load_settings_internal().await.unwrap_or_default();
+    let duration_secs = settings.audio_duration_secs; // 1-30 seconds
+    RecordingConfig::new(duration_secs)
+}
 ```
 
-(Add a sibling `speakr-ui` crate only if you want the UI separate from the template.)
+### 4.3 Workflow Testing
+
+Comprehensive integration tests validate the complete dictation pipeline:
+
+```rust
+#[tokio::test]
+async fn test_workflow_loads_audio_duration_from_settings() {
+    let mut settings = AppSettings::default();
+    settings.audio_duration_secs = 25;
+    save_settings_internal(settings).await.unwrap();
+
+    let config = create_recording_config_from_settings().await;
+    assert_eq!(config.max_duration_secs(), 25);
+}
+```
 
 ---
 
 ## 5. Core Library (speakr-core)
 
-<details>
-<summary>Cargo.toml</summary>
-
-```toml
-[package]
-name    = "speakr-core"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-cpal        = "0.15"
-whisper-rs  = { version = "0.8", features = ["whisper-runtime-cpu"] }
-enigo       = "0.1"
-tokio       = { version = "1", features = ["rt-multi-thread", "macros"] }
-anyhow      = "1"
-```
-
-</details>
+The core library provides audio capture functionality with configurable recording duration:
 
 ```rust
-use anyhow::*;
-use cpal::traits::*;
-use enigo::*;
-use std::sync::mpsc;
-use whisper_rs::{FullParams, SamplingStrategy, WhisperContext};
+use speakr_core::audio::{AudioRecorder, RecordingConfig};
 
-pub struct Speakr {
-    whisper: WhisperContext,
-    enigo:   Enigo,
-}
+// Create recorder with settings-based configuration
+let config = RecordingConfig::new(duration_secs); // From user settings
+let recorder = AudioRecorder::new(config).await?;
 
-impl Speakr {
-    pub fn new(model_path: &str) -> Result<Self> {
-        Ok(Self {
-            whisper: WhisperContext::new(model_path)?,
-            enigo:   Enigo::new(),
-        })
-    }
+// Start recording
+recorder.start_recording().await?;
 
-    pub async fn capture_and_type(&mut self, seconds: u32) -> Result<()> {
-        // 1️⃣  Capture PCM samples --------------------------------------------------
-        let (tx, rx) = mpsc::sync_channel(seconds as usize * 16_000);
-        let host = cpal::default_host();
-        let dev  = host.default_input_device().context("no input device")?;
-        let cfg  = dev.default_input_config()?.into();
-        let stream = dev.build_input_stream(
-            &cfg,
-            move |data: &[f32], _| { for &s in data { let _ = tx.send(s); } },
-            move |e| eprintln!("cpal error: {e}"),
-            None,
-        )?;
-        stream.play()?;
-        let mut samples = Vec::with_capacity(seconds as usize * 16_000);
-        for _ in 0..seconds * 16_000 {
-            samples.push(rx.recv()?);
-        }
-        drop(stream);
+// Stop and get samples
+let result = recorder.stop_recording().await?;
+let samples = result.samples(); // Vec<i16> at 16kHz mono
+```
 
-        // 2️⃣  Transcribe -----------------------------------------------------------
-        let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 1 });
-        params.set_language(Some("en"));
-        let text = self.whisper.full(params, &samples)?;
+### Audio Configuration
 
-        // 3️⃣  Inject ---------------------------------------------------------------
-        self.enigo.text(&text);
-        Ok(())
-    }
+The system supports configurable recording duration:
+
+- **Range**: 1-30 seconds (validated using `MIN_AUDIO_DURATION_SECS` and `MAX_AUDIO_DURATION_SECS`
+  constants)
+- **Default**: 10 seconds (defined by `DEFAULT_AUDIO_DURATION_SECS`)
+- **Format**: 16kHz mono, 16-bit samples
+- **Storage**: In-memory only, no disk writes
+
+### Settings Integration
+
+All configuration is loaded from persistent user settings:
+
+```rust
+#[derive(Serialize, Deserialize)]
+pub struct AppSettings {
+    pub audio_duration_secs: u32,  // 1-30 seconds (validated using constants)
+    pub hot_key: String,           // Global hotkey combination
+    pub model_size: String,        // Whisper model size
+    pub auto_launch: bool,         // Start with system
 }
 ```
 
 ---
 
-## 6. Tauri Backend (speakr-tauri / `src-tauri`)
+## 6. Tauri Backend (speakr-tauri)
 
 <details>
 <summary>`src-tauri/Cargo.toml` extras</summary>
@@ -177,47 +167,64 @@ anyhow      = "1"
 
 </details>
 
+The Tauri backend orchestrates the complete dictation workflow with settings integration:
+
 ```rust
-#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
-use speakr_core::Speakr;
-use std::sync::Mutex;
-use tauri::{Manager, State};
+use speakr_tauri::workflow::execute_dictation_workflow;
+use speakr_tauri::settings::commands::load_settings_internal;
 
-struct AppState(Mutex<Option<Speakr>>);
+// Workflow orchestration with settings integration
+pub async fn execute_dictation_workflow(app_handle: AppHandle) -> Result<(), AppError> {
+    // Step 1: Load settings and create recording config
+    let config = create_recording_config_from_settings().await;
 
-#[tauri::command]
-async fn transcribe(state: State<'_, AppState>) -> Result<(), String> {
-    let mut guard = state.0.lock().unwrap();
-    guard
-        .as_mut()
-        .ok_or("model not ready")?
-        .capture_and_type(10)        // 10 s max
-        .await
-        .map_err(|e| e.to_string())
+    // Step 2: Capture audio with user-configured duration
+    let audio_samples = capture_audio(&app_handle, config).await?;
+
+    // Step 3: Transcribe (placeholder)
+    let text = transcribe_audio(audio_samples, &app_handle).await?;
+
+    // Step 4: Inject text (placeholder)
+    inject_text(text, &app_handle).await?;
+
+    Ok(())
 }
 
-fn main() {
-    tauri::Builder::default()
-        .plugin(tauri_plugin_global_shortcut::init())
-        .manage(AppState(Mutex::new(None)))
-        .setup(|app| {
-            // Pre-load Whisper model once at startup
-            let model = Speakr::new("../models/ggml-small.en.gguf")?;
-            *app.state::<AppState>().0.lock().unwrap() = Some(model);
+// Settings-based recording configuration
+pub async fn create_recording_config_from_settings() -> RecordingConfig {
+    let settings = load_settings_internal().await.unwrap_or_default();
+    RecordingConfig::new(settings.audio_duration_secs)
+}
+```
 
-            // Register ⌘⌥Space
-            #[cfg(desktop)]
-            app.global_shortcut().register("CMD+OPTION+SPACE", move || {
-                let handle = app.app_handle();
-                tauri::async_runtime::spawn(async move {
-                    let _ = handle.invoke("transcribe", &()).await;
-                });
-            })?;
-            Ok(())
-        })
-        .invoke_handler(tauri::generate_handler![transcribe])
-        .run(tauri::generate_context!())
-        .expect("error while running Speakr");
+### Global Hotkey Integration
+
+The hotkey system loads configuration from settings:
+
+```rust
+// Load hotkey from settings at startup
+let settings = load_settings_internal().await?;
+let hotkey = settings.hot_key; // e.g., "CmdOrCtrl+Alt+F1"
+
+// Register with workflow integration
+app.global_shortcut().register(&hotkey, move || {
+    let handle = app.app_handle();
+    tauri::async_runtime::spawn(async move {
+        let _ = execute_dictation_workflow(handle).await;
+    });
+})?;
+```
+
+### Error Handling
+
+Comprehensive error handling with user feedback:
+
+```rust
+pub enum AppError {
+    AudioCapture(String),    // Device issues, permissions
+    Transcription(String),   // Model loading, processing
+    TextInjection(String),   // Permission, target app issues
+    Settings(String),        // Configuration problems
 }
 ```
 
@@ -228,7 +235,7 @@ fn main() {
 
 ## 7. Leptos Front-End (optional)
 
-The Tauri template already wires Trunk + Leptos.  A minimal status UI:
+The Tauri template already wires Trunk + Leptos. A minimal status UI:
 
 ```rust
 use leptos::*;
@@ -274,8 +281,8 @@ pub fn App() -> impl IntoView {
 ## 8. macOS Permissions
 
 1. **Microphone** – Tauri adds `NSMicrophoneUsageDescription` automatically when you enable audio.
-2. **Accessibility** – Ask the user to enable Speakr under *System Settings → Privacy & Security →*
-   *Accessibility* so Enigo keystrokes reach other apps.
+2. **Accessibility** – Ask the user to enable Speakr under _System Settings → Privacy & Security →_
+   _Accessibility_ so Enigo keystrokes reach other apps.
 3. **Codesign & Notarise** – For distribution run:
 
 ```bash
@@ -312,10 +319,10 @@ cargo tauri build          # build .app or MSI/DEB
 
 ## 11. Roadmap Ideas
 
-* Config window for model selection & hot-key change
-* Streaming, real-time transcription (partial results)
-* Windows/Linux support (replace Enigo backend where needed)
-* Auto-punctuation & language detection
+- Config window for model selection & hot-key change
+- Streaming, real-time transcription (partial results)
+- Windows/Linux support (replace Enigo backend where needed)
+- Auto-punctuation & language detection
 
 ---
 

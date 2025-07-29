@@ -5,13 +5,16 @@ Registers a system-wide hot-key at application start that toggles the
 
 ## Requirement
 
-1. The application must register a global hot-key (default **⌥ Option + `~`**).
+1. The application must register a global hot-key (default **⌘ Cmd + ⌥ Option + Space**,
+   configurable via settings).
 2. Must be active even when Speakr is running in the background.
-3. Pressing the hot-key initiates, in order:
+3. The hot-key configuration is loaded from persisted settings at startup, with fallback to default
+   if loading fails.
+4. Pressing the hot-key initiates, in order:
    1. Audio recording
    2. Transcription
    3. Text injection into the current focused field.
-4. The hot-key must be configurable in Settings and warn on conflicts.
+5. The hot-key must be configurable in Settings and warn on conflicts.
 
 ## Rationale
 
@@ -20,7 +23,9 @@ flow.
 
 ## Acceptance Criteria
 
-- [ ] Hot-key can be triggered from any application on macOS 13+.
+- [x] Hot-key can be triggered from any application on macOS 13+.
+- [x] Hot-key configuration is loaded from persisted settings at startup.
+- [x] Fallback to default hot-key when settings loading fails.
 - [ ] 95th percentile **time-to-text ≤ 3 s** for 5 s recordings on M-series Macs.
 - [ ] 99 % activation success rate in telemetry.
 - [ ] Changing the hot-key in Settings updates the registration immediately and prevents duplicates.

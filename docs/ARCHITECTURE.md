@@ -3,12 +3,16 @@ title: Technical Architecture – Speakr
 version: 2025-07-20
 status: Draft
 ---
+
 # Speakr – Technical Architecture
 
 - [1. Purpose](#1-purpose)
 - [2. High-Level Architecture](#2-high-level-architecture)
 - [3. Crate \& Directory Layout](#3-crate--directory-layout)
+  - [3.1 Speakr-Tauri Internal Structure](#31-speakr-tauri-internal-structure)
 - [4. Runtime Flow (Happy Path)](#4-runtime-flow-happy-path)
+  - [Settings Integration](#settings-integration)
+  - [Workflow Error Handling](#workflow-error-handling)
 - [5. Concurrency \& Safety](#5-concurrency--safety)
 - [6. Security \& Permissions](#6-security--permissions)
 - [7. Build \& Packaging](#7-build--packaging)
@@ -106,15 +110,25 @@ speakr-tauri/src/
 │   ├── mod.rs         # Audio module coordination
 │   ├── files.rs       # Audio file operations
 │   └── recording.rs   # Audio recording helpers
+├── workflow.rs        # Dictation workflow orchestration
 └── lib.rs             # Tauri app setup, command registration
+
+tests/
+├── workflow_tests.rs  # Integration tests for dictation pipeline
+├── settings_tests.rs  # Settings persistence and validation tests
+├── hotkey_tests.rs    # Global hotkey functionality tests
+└── integration_tests.rs # Cross-module integration tests
 ```
 
 **Key architectural principles:**
 
-- **Separation of concerns**: Business logic in `*_internal()` functions, Tauri integration
-  in `lib.rs`
+- **Separation of concerns**: Business logic in `*_internal()` functions, Tauri integration in
+  `lib.rs`
 - **Testability**: Internal functions can be tested without Tauri runtime overhead
 - **Modularity**: Commands grouped by functional domain rather than technical implementation
+- **Settings integration**: All configurable behaviour loads from persistent user settings
+- **Workflow orchestration**: Complete dictation pipeline managed in `workflow.rs`
+- **Comprehensive testing**: Integration tests validate end-to-end functionality
 - **Documentation**: Each module has comprehensive rustdoc explaining its purpose and usage
 
 ---
@@ -123,12 +137,36 @@ speakr-tauri/src/
 
 | Step | Thread/Task            | Action                                                           | Typical Latency                 |
 | ---- | ---------------------- | ---------------------------------------------------------------- | ------------------------------- |
-| 1    | Main (OS)              | User presses ⌘⌥Space                                             | –                               |
-| 2    | Tauri shortcut handler | Spawns async task `transcribe()`                                 | < 1 ms                          |
-| 3    | Tokio worker           | `cpal::Stream` captures 16-kHz mono PCM into ring-buffer         | 0–10 s (configurable)           |
-| 4    | Same task              | PCM fed into `whisper_rs::full()`                                | ~1 s per 10 s audio on M-series |
-| 5    | Same task              | Transcript returned → `enigo.text()` synthesises keystrokes      | ≤ 300 ms                        |
-| 6    | UI task                | Frontend receives status events via `emit()` and updates overlay | realtime                        |
+| 1    | Main (OS)              | User presses configured hotkey (loaded from settings at startup) | –                               |
+| 2    | Tauri shortcut handler | Spawns async task `execute_dictation_workflow()`                 | < 1 ms                          |
+| 3    | Workflow orchestrator  | Loads audio duration from user settings (1-30s configurable)     | < 10 ms                         |
+| 4    | Tokio worker           | `cpal::Stream` captures 16-kHz mono PCM into ring-buffer         | 0–30 s (user configurable)      |
+| 5    | Same task              | PCM fed into `whisper_rs::full()`                                | ~1 s per 10 s audio on M-series |
+| 6    | Same task              | Transcript returned → `enigo.text()` synthesises keystrokes      | ≤ 300 ms                        |
+| 7    | UI task                | Frontend receives status events via `emit()` and updates overlay | realtime                        |
+
+### Settings Integration
+
+The workflow system integrates deeply with user settings:
+
+- **Audio Duration**: Recording duration (1-30 seconds) loaded from
+  `AppSettings.audio_duration_secs`
+- **Hotkey Configuration**: Global hotkey combination loaded from `AppSettings.hot_key` at startup
+- **Model Selection**: Whisper model size loaded from `AppSettings.model_size` (placeholder)
+- **Fallback Behaviour**: Default values used when settings loading fails
+- **Validation**: All settings validated before persistence with comprehensive error handling
+- **Migration**: Schema versioning supports settings format evolution
+
+### Workflow Error Handling
+
+Each workflow step includes comprehensive error handling:
+
+- **Audio Capture Errors**: Device unavailable, permission denied, format issues
+- **Transcription Errors**: Model loading failures, processing errors (placeholder implementation)
+- **Text Injection Errors**: Permission issues, target application problems (placeholder
+  implementation)
+- **Settings Errors**: Invalid configuration, file system issues, validation failures
+- **Recovery Mechanisms**: Graceful degradation and user feedback via status events
 
 Failure cases (no mic, model missing, permission denied) surface via error events and native
 notifications.
@@ -138,8 +176,8 @@ notifications.
 ## 5. Concurrency & Safety
 
 - **Tokio** multi-thread runtime drives asynchronous recording and Whisper inference.
-- The `AppState(Mutex<Option<Speakr>>)` guards the singleton Whisper context; loading occurs once
-  at app start.
+- The `AppState(Mutex<Option<Speakr>>)` guards the singleton Whisper context; loading occurs once at
+  app start.
 - Hot-key handler offloads work to the runtime to keep the UI thread non-blocking.
 - Audio buffer uses a bounded `sync_channel` to avoid unbounded RAM growth.
 
@@ -150,7 +188,7 @@ notifications.
 | Platform | Permission        | Why                       | Request Mechanism                                     |
 | -------- | ----------------- | ------------------------- | ----------------------------------------------------- |
 | macOS    | Microphone access | Record audio              | `NSMicrophoneUsageDescription` (Info.plist)           |
-| macOS    | Accessibility     | Send synthetic keystrokes | User enables app in *System Settings ▸ Accessibility* |
+| macOS    | Accessibility     | Send synthetic keystrokes | User enables app in _System Settings ▸ Accessibility_ |
 | All      | Global shortcut   | Register hot-key          | `global-shortcut:allow-register` capability           |
 
 The app runs **offline**; no data leaves the device.
@@ -178,12 +216,12 @@ The app runs **offline**; no data leaves the device.
 
 ## 9. Risks & Mitigations
 
-| Risk                                         | Mitigation                                             |
-| -------------------------------------------- | ------------------------------------------------------ |
-| Keystroke injection blocked in secure fields | Fallback to clipboard-paste mode with warning          |
-| Whisper latency on older CPUs                | Offer `tiny.en.gguf` and shorter max record time       |
-| Shortcut clashes                             | UI lets user redefine hot-key and validates uniqueness |
-| Model file missing/corrupt                   | Verify checksum on load and show error dialogue        |
+| Risk                                         | Mitigation                                                                |
+| -------------------------------------------- | ------------------------------------------------------------------------- |
+| Keystroke injection blocked in secure fields | Fallback to clipboard-paste mode with warning                             |
+| Whisper latency on older CPUs                | Offer `tiny.en.gguf` and shorter max record time                          |
+| Shortcut clashes                             | UI lets user redefine hot-key, validates uniqueness, persists to settings |
+| Model file missing/corrupt                   | Verify checksum on load and show error dialogue                           |
 
 ---
 
@@ -196,5 +234,5 @@ The app runs **offline**; no data leaves the device.
 
 ---
 
-*This document replaces the previous placeholder `docs/ARCHITECTURE.md` and should be kept*
-*up-to-date with all architectural changes.*
+_This document replaces the previous placeholder `docs/ARCHITECTURE.md` and should be kept_
+_up-to-date with all architectural changes._

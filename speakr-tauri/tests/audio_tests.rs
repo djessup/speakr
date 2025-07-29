@@ -10,7 +10,7 @@ use speakr_lib::audio::recording::{debug_record_audio_to_file, debug_record_real
 
 #[tokio::test]
 async fn test_debug_record_audio_to_file_saves_with_timestamp() {
-    // 🔴 RED: This test should fail because the function doesn't exist yet
+    // Verifies that the helper creates a timestamped filename and non-empty WAV file
     use std::time::SystemTime;
 
     // Arrange
@@ -57,7 +57,7 @@ async fn test_debug_record_audio_to_file_saves_with_timestamp() {
 
 #[tokio::test]
 async fn test_debug_record_audio_to_file_creates_unique_filenames() {
-    // 🔴 RED: This test should fail because the function doesn't exist yet
+    // Ensures successive recordings generate unique filenames
     use tempfile::TempDir;
 
     // Arrange
@@ -84,7 +84,7 @@ async fn test_debug_record_audio_to_file_creates_unique_filenames() {
 
 #[tokio::test]
 async fn test_save_audio_samples_to_wav_file() {
-    // 🔴 RED: This test should fail because the function doesn't exist yet
+    // Confirms WAV encoder writes a valid RIFF/WAVE header and data section
     use tempfile::TempDir;
 
     // Arrange
@@ -120,7 +120,7 @@ async fn test_save_audio_samples_to_wav_file() {
 
 #[tokio::test]
 async fn test_generate_audio_filename_with_timestamp() {
-    // 🔴 RED: This test should fail because the function doesn't exist yet
+    // Validates timestamp components and uniqueness over time
     use std::time::SystemTime;
 
     // Act
@@ -154,7 +154,7 @@ async fn test_generate_audio_filename_with_timestamp() {
 #[tokio::test]
 #[ignore = "Requires audio hardware access - run manually with 'cargo test -- --ignored'"]
 async fn test_debug_real_audio_recording_integration() {
-    // 🔴 RED: This test should fail because the real integration doesn't exist yet
+    // Integration test for real audio capture – ignored by default because it needs hardware
     use tempfile::TempDir;
 
     // Arrange

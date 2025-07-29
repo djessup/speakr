@@ -24,6 +24,9 @@ use speakr_types::{AppError, AppSettings};
 /// # Internal API
 /// This function is only intended for internal use and testing.
 pub async fn save_settings_internal(settings: AppSettings) -> Result<(), AppError> {
+    // Validate settings before saving
+    settings.validate().map_err(AppError::Settings)?;
+
     // Use the global settings directory for production
     let settings_path = get_settings_path()?;
     let settings_dir = settings_path

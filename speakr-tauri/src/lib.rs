@@ -36,12 +36,16 @@ use debug::{
 };
 use services::{
     get_backend_status_internal,
-    hotkey::{register_global_hotkey_internal, unregister_global_hotkey_internal},
+    hotkey::{
+        register_global_hotkey_internal, unregister_global_hotkey_internal,
+        update_global_hotkey_internal,
+    },
     update_service_status_internal, ServiceComponent,
 };
 use settings::{load_settings_internal, save_settings_internal};
 use speakr_types::{AppError, AppSettings, HotkeyConfig, ServiceStatus, StatusUpdate};
 use tauri::{App, AppHandle, Listener, Manager};
+use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 use tracing::{error, info, warn};
 use tracing_subscriber::fmt::fmt;
 use tracing_subscriber::EnvFilter;
@@ -167,6 +171,20 @@ async fn unregister_global_hotkey(app_handle: AppHandle) -> Result<(), String> {
 }
 
 // --------------------------------------------------------------------------
+/// Updates the global hotkey by re-registering with a new configuration.
+///
+/// # Arguments
+/// * `app_handle` - The Tauri application handle
+/// * `config` - The new hotkey configuration
+///
+/// # Returns
+/// Returns `Ok(())` if update succeeds, or an error string otherwise.
+#[tauri::command]
+async fn update_global_hotkey(app_handle: AppHandle, config: HotkeyConfig) -> Result<(), String> {
+    update_global_hotkey_internal(app_handle, config).await
+}
+
+// --------------------------------------------------------------------------
 /// Sets the auto-launch preference for the application.
 ///
 /// # Arguments
@@ -263,10 +281,6 @@ fn setup_app(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
 
     #[cfg(desktop)]
     {
-        use tauri_plugin_global_shortcut::{
-            Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState,
-        };
-
         let ctrl_n_shortcut = Shortcut::new(Some(Modifiers::CONTROL), Code::KeyN);
         app.handle().plugin(
             tauri_plugin_global_shortcut::Builder::new()
@@ -336,12 +350,25 @@ fn spawn_register_default_hotkey(app_handle: AppHandle) {
 
 // Performs default and fallback hotkey registration
 async fn register_default_hotkey(app_handle: AppHandle) {
-    let default_config = HotkeyConfig {
-        shortcut: "CmdOrCtrl+Alt+Space".to_string(),
-        enabled: true,
+    // Load hotkey from persisted settings, falling back to default if loading fails
+    let hotkey_config = match load_settings_internal().await {
+        Ok(settings) => {
+            info!("Loaded hotkey from settings: {}", settings.hot_key);
+            HotkeyConfig {
+                shortcut: settings.hot_key,
+                enabled: true,
+            }
+        }
+        Err(e) => {
+            warn!("Failed to load settings, using default hotkey: {}", e);
+            HotkeyConfig {
+                shortcut: "CmdOrCtrl+Alt+Space".to_string(),
+                enabled: true,
+            }
+        }
     };
 
-    info!("Registering default hotkey: {}", default_config.shortcut);
+    info!("Registering hotkey: {}", hotkey_config.shortcut);
     // #[cfg(debug_assertions)]
     // add_debug_log(
     //     DebugLogLevel::Info,
@@ -349,19 +376,12 @@ async fn register_default_hotkey(app_handle: AppHandle) {
     //     &format!("Registering default hotkey: {}", default_config.shortcut)
     // );
 
-    if let Err(e) =
-        register_global_hotkey_internal(app_handle.clone(), default_config.clone()).await
+    if let Err(e) = register_global_hotkey_internal(app_handle.clone(), hotkey_config.clone()).await
     {
         error!(
-            "⚠️  Failed to register default hotkey '{}': {}",
-            default_config.shortcut, e
+            "⚠️  Failed to register hotkey '{}': {}",
+            hotkey_config.shortcut, e
         );
-        // #[cfg(debug_assertions)]
-        // add_debug_log(
-        //     DebugLogLevel::Error,
-        //     "speakr-tauri",
-        //     &format!("Failed to register default hotkey: {e}")
-        // );
         warn!("💡 You can change the hotkey in Settings to avoid conflicts");
 
         // Fallback hotkey
@@ -376,29 +396,17 @@ async fn register_default_hotkey(app_handle: AppHandle) {
                 "⚠️  Fallback hotkey '{}' also failed: {}",
                 fallback_config.shortcut, e2
             );
-            // #[cfg(debug_assertions)]
-            // add_debug_log(
-            //     DebugLogLevel::Error,
-            //     "speakr-tauri",
-            //     &format!("Fallback hotkey also failed: {e2}")
-            // );
             warn!("App will start without global hotkey - configure one in Settings");
         } else {
             info!("Using fallback hotkey: {}", fallback_config.shortcut);
-            // #[cfg(debug_assertions)]
-            // add_debug_log(
-            //     DebugLogLevel::Info,
-            //     "speakr-tauri",
-            //     &format!("Using fallback hotkey: {}", fallback_config.shortcut)
-            // );
         }
     } else {
-        info!("Default hotkey registered: {}", default_config.shortcut);
+        info!("Hotkey registered: {}", hotkey_config.shortcut);
         #[cfg(debug_assertions)]
         add_debug_log(
             DebugLogLevel::Info,
             "speakr-tauri",
-            &format!("Default hotkey registered: {}", default_config.shortcut),
+            &format!("Hotkey registered: {}", hotkey_config.shortcut),
         );
     }
 }
@@ -435,6 +443,7 @@ pub fn run() {
                     set_auto_launch,
                     register_global_hotkey,
                     unregister_global_hotkey,
+                    update_global_hotkey,
                     debug_test_audio_recording,
                     debug_start_recording,
                     debug_stop_recording,
@@ -455,6 +464,7 @@ pub fn run() {
                     set_auto_launch,
                     register_global_hotkey,
                     unregister_global_hotkey,
+                    update_global_hotkey,
                     get_backend_status,
                     update_service_status
                 ]
