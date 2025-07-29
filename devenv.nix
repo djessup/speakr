@@ -108,18 +108,25 @@ in
     ]
     ++ lib.optionals pkgs.stdenv.isLinux [
       # Linux-specific libraries for Tauri and native dependencies
-      pkgs.glib
-      pkgs.glib.dev
-      pkgs.gtk3
-      pkgs.gtk3.dev
-      pkgs.webkitgtk
-      pkgs.libsoup
-      pkgs.librsvg
-      pkgs.atk
-      pkgs.gdk-pixbuf
-      pkgs.cairo
-      pkgs.pango
       pkgs.pkg-config
+      pkgs.gobject-introspection
+      # pkgs.glib.dev
+      # pkgs.gtk3.dev
+      # pkgs.webkitgtk
+      # pkgs.libsoup
+      # pkgs.atk
+      pkgs.at-spi2-atk
+      pkgs.atkmm
+      pkgs.cairo
+      pkgs.gdk-pixbuf
+      pkgs.glib
+      pkgs.gtk3
+      pkgs.harfbuzz
+      pkgs.librsvg
+      pkgs.libsoup_3
+      pkgs.pango
+      pkgs.webkitgtk_4_1
+      pkgs.openssl
     ];
 
   # Development scripts
