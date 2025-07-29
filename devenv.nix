@@ -28,15 +28,15 @@ in
     TAURI_SKIP_DEVSERVER_CHECK = "true";
     # Frontend development
     TRUNK_SERVE_PORT = "1420";
+    # Suppress direnv export listings
+    DIRENV_LOG_FORMAT = "";
 
-    # macOS linking fix - expose library and include paths
+  # macOS linking fix - expose library and include paths
+  } // lib.optionalAttrs pkgs.stdenv.isDarwin {
     LIBRARY_PATH = "${pkgs.darwin.libiconv}/lib:${pkgs.lib.makeLibraryPath [ pkgs.darwin.libiconv ]}";
     CPATH = "${pkgs.darwin.libiconv}/include";
     LDFLAGS = "-L${pkgs.darwin.libiconv}/lib";
     CPPFLAGS = "-I${pkgs.darwin.libiconv}/include";
-
-    # Suppress direnv export listings
-    DIRENV_LOG_FORMAT = "";
   };
 
   # Language configurations
