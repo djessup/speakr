@@ -103,6 +103,20 @@ in
     ++ lib.optionals pkgs.stdenv.isDarwin [
       # macOS-specific libraries
       pkgs.darwin.libiconv
+    ]
+    ++ lib.optionals pkgs.stdenv.isLinux [
+      # Linux-specific libraries for Tauri and native dependencies
+      pkgs.glib
+      pkgs.glib.dev
+      pkgs.gtk3
+      pkgs.gtk3.dev
+      pkgs.webkitgtk
+      pkgs.libsoup
+      pkgs.librsvg
+      pkgs.atk
+      pkgs.gdk-pixbuf
+      pkgs.cairo
+      pkgs.pango
     ];
 
   # Development scripts
