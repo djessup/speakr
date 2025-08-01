@@ -13,9 +13,10 @@
 //!
 //! # Architecture
 //!
-//! The crate is organised into two main modules:
+//! The crate is organised into three main modules:
 //! - [`audio`] - Audio capture and recording functionality
 //! - [`model`] - Whisper model management and metadata handling
+//! - [`transcription`] - Speech-to-text transcription processing
 //!
 //! # Usage
 //!
@@ -81,4 +82,41 @@ pub mod audio;
 /// with proper checksum verification and metadata extraction.
 pub mod model;
 
+/// Speech-to-text transcription functionality.
+///
+/// Provides core transcription capabilities for converting audio samples
+/// into text using Whisper models, with support for language detection,
+/// performance monitoring, and model management.
+pub mod transcription;
+
 // ===========================================================================
+
+#[cfg(test)]
+mod tests {
+    //! Unit tests for module structure verification.
+
+    /// Test that the transcription module structure exists and can be imported.
+    ///
+    /// This test verifies task 1.1 requirements: transcription module and submodules
+    /// (engine, models, language, performance) are properly structured.
+    #[test]
+    fn test_transcription_module_structure() {
+        // This test verifies that all required modules can be imported successfully.
+        // If any import fails, the test will fail to compile.
+
+        // Test that we can create instances from each submodule
+        use crate::transcription::engine::TranscriptionEngine;
+        use crate::transcription::language::LanguageDetector;
+        use crate::transcription::models::ModelManager;
+        use crate::transcription::performance::PerformanceMonitor;
+
+        // Create instances to verify the structs are accessible
+        let _engine = TranscriptionEngine::new();
+        let _models = ModelManager::new();
+        let _language = LanguageDetector::new();
+        let _performance = PerformanceMonitor::new();
+
+        // If we reach here, the module structure is properly created
+        // This is a better test than assert!(true) as it actually exercises the imports
+    }
+}
