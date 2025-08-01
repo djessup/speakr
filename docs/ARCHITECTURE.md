@@ -15,6 +15,8 @@ status: Draft
   - [Workflow Error Handling](#workflow-error-handling)
 - [5. Concurrency \& Safety](#5-concurrency--safety)
 - [6. Security \& Permissions](#6-security--permissions)
+  - [6.1 System Permissions](#61-system-permissions)
+  - [6.2 Data Security \& Input Validation](#62-data-security--input-validation)
 - [7. Build \& Packaging](#7-build--packaging)
 - [8. Extensibility Points](#8-extensibility-points)
 - [9. Risks \& Mitigations](#9-risks--mitigations)
@@ -98,9 +100,10 @@ speakr-tauri/src/
 │   └── types.rs       # Shared service types and enums
 ├── settings/          # Configuration persistence and validation
 │   ├── mod.rs         # Settings management
-│   ├── persistence.rs # File I/O for settings
+│   ├── persistence.rs # File I/O, atomic operations, and security controls
 │   ├── migration.rs   # Settings schema migration
-│   └── validation.rs  # Settings validation logic
+│   ├── validation.rs  # Settings validation logic
+│   └── traits.rs      # Settings loading traits for dependency injection
 ├── debug/             # Debug-only functionality
 │   ├── mod.rs         # Debug command coordination
 │   ├── commands.rs    # Debug-specific Tauri commands
@@ -185,13 +188,35 @@ notifications.
 
 ## 6. Security & Permissions
 
+### 6.1 System Permissions
+
 | Platform | Permission        | Why                       | Request Mechanism                                     |
 | -------- | ----------------- | ------------------------- | ----------------------------------------------------- |
 | macOS    | Microphone access | Record audio              | `NSMicrophoneUsageDescription` (Info.plist)           |
 | macOS    | Accessibility     | Send synthetic keystrokes | User enables app in _System Settings ▸ Accessibility_ |
 | All      | Global shortcut   | Register hot-key          | `global-shortcut:allow-register` capability           |
 
-The app runs **offline**; no data leaves the device.
+### 6.2 Data Security & Input Validation
+
+The application implements comprehensive security measures for data handling:
+
+**Settings Security:**
+
+- **File Size Limits**: Settings files are limited to 64KB to prevent DoS attacks
+- **Unknown Field Rejection**: All deserializable structs use `#[serde(deny_unknown_fields)]` to
+  reject malicious JSON with extra fields
+- **Path Traversal Protection**: File path validation rejects `..`, absolute paths, and control
+  characters
+- **Enhanced Error Messages**: `serde_path_to_error` provides detailed JSON parsing errors with
+  field paths
+- **Atomic File Operations**: Settings are written atomically with backup/recovery mechanisms
+
+**Runtime Security:**
+
+- **No Network Access**: All processing happens locally; no data leaves the device
+- **Input Sanitization**: All user inputs are validated before processing
+- **Error Handling**: Comprehensive error types prevent information leakage
+- **Test Isolation**: Filesystem tests use temporary directories to avoid touching user data
 
 ---
 

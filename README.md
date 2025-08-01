@@ -14,6 +14,7 @@ using Whisper models.
 - **Local AI**: Uses OpenAI Whisper models (GGUF format) stored on your device
 - **Global hotkeys**: Configurable system-wide shortcuts (default: `CmdOrCtrl+Alt+F1`)
 - **Modern UI**: Clean, accessible interface built with Leptos and comprehensive settings
+- **Security-hardened**: Input validation, DoS protection, and secure configuration handling
 
 ## Project Structure
 
@@ -21,8 +22,8 @@ This workspace contains four main crates:
 
 - **[`speakr-core/`](speakr-core/)** - Core functionality (Whisper transcription, audio capture,
   text injection)
-- **[`speakr-tauri/`](speakr-tauri/)** - Tauri backend (global hotkeys, settings management,
-  event handling)
+- **[`speakr-tauri/`](speakr-tauri/)** - Tauri backend (global hotkeys, settings management, event
+  handling)
 - **[`speakr-ui/`](speakr-ui/)** - Frontend UI (Leptos components and styling)
 - **[`speakr-types/`](speakr-types/)** - Shared types and data structures
 
@@ -97,6 +98,8 @@ Speakr follows **Test-Driven Development (TDD)**:
 - **Dependency injection** - Use traits and mocking for testable code
 - **Error handling** - Comprehensive error types with meaningful messages
 - **Constants over magic numbers** - Use named constants for validation limits and defaults
+- **Security-first** - Input validation, schema enforcement, and DoS protection for all data
+  handling
 
 ## 🔐 Privacy & Security
 
@@ -153,5 +156,5 @@ allowing the UI to be closed without disabling dictation functionality.
 
 ---
 
-_Made with cold heartless LLMs for_
-_~~privacy-conscious users who want fast, local dictation on macOS~~ myself, it's just for me._
+_Made with cold heartless LLMs for_ _~~privacy-conscious users who want fast, local dictation on
+macOS~~ myself, it's just for me._

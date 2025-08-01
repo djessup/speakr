@@ -67,24 +67,35 @@ Use a Cargo workspace so all three crates share versions and CI.
 
 ### 4.1 Completed Components
 
-- **Settings System**: Persistent configuration with validation and migration support
+- **Settings System**: Persistent configuration with validation, migration support, and
+  comprehensive security measures
 - **Global Hotkey**: System-wide hotkey registration with conflict detection
 - **Audio Capture**: 16kHz mono recording with configurable duration (1-30 seconds)
 - **Workflow Orchestration**: Complete pipeline integration with error handling
 - **Testing Infrastructure**: Comprehensive test coverage with TDD practices
+- **Security Framework**: Input validation, DoS protection, and secure data handling
 
-### 4.2 Settings Integration
+### 4.2 Settings Integration & Security
 
-The system includes robust settings integration:
+The system includes robust settings integration with comprehensive security measures:
 
 ```rust
-// Audio duration loaded from user settings
+// Audio duration loaded from user settings with validation
 pub async fn create_recording_config_from_settings() -> RecordingConfig {
     let settings = load_settings_internal().await.unwrap_or_default();
-    let duration_secs = settings.audio_duration_secs; // 1-30 seconds
+    let duration_secs = settings.audio_duration_secs; // 1-30 seconds, validated
     RecordingConfig::new(duration_secs)
 }
 ```
+
+**Security Features:**
+
+- **File Size Limits**: Settings files are capped at 64KB to prevent DoS attacks
+- **Schema Validation**: All settings structs reject unknown fields using
+  `#[serde(deny_unknown_fields)]`
+- **Input Sanitization**: Path traversal protection and comprehensive input validation
+- **Atomic Operations**: Settings are written atomically with backup/recovery mechanisms
+- **Enhanced Error Reporting**: Detailed JSON parsing errors with field-level diagnostics
 
 ### 4.3 Workflow Testing
 
