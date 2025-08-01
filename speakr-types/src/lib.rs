@@ -23,7 +23,8 @@
 // =========================
 // External Imports
 // =========================
-use serde::{ Deserialize, Serialize };
+use serde::{Deserialize, Serialize};
+use std::time::Duration;
 use thiserror::Error;
 
 // ============================================================================
@@ -378,14 +379,10 @@ impl AppSettings {
     /// ```
     pub fn validate(&self) -> Result<(), String> {
         if !Self::validate_audio_duration(self.audio_duration_secs) {
-            return Err(
-                format!(
-                    "Invalid audio duration: {} seconds. Must be between {} and {} seconds.",
-                    self.audio_duration_secs,
-                    MIN_AUDIO_DURATION_SECS,
-                    MAX_AUDIO_DURATION_SECS
-                )
-            );
+            return Err(format!(
+                "Invalid audio duration: {} seconds. Must be between {} and {} seconds.",
+                self.audio_duration_secs, MIN_AUDIO_DURATION_SECS, MAX_AUDIO_DURATION_SECS
+            ));
         }
 
         // Add other validation checks here as needed
@@ -581,32 +578,255 @@ impl ModelInfo {
     /// ```
     pub fn for_size(size: ModelSize) -> Self {
         match size {
-            ModelSize::Small =>
-                ModelInfo {
-                    size: ModelSize::Small,
-                    filename: "ggml-small.bin".to_string(),
-                    display_name: "Small (39MB, fast)".to_string(),
-                    file_size_mb: 39,
-                    description: "Fast processing, good for quick notes",
-                },
-            ModelSize::Medium =>
-                ModelInfo {
-                    size: ModelSize::Medium,
-                    filename: "ggml-medium.bin".to_string(),
-                    display_name: "Medium (769MB, balanced)".to_string(),
-                    file_size_mb: 769,
-                    description: "Balanced accuracy and speed",
-                },
-            ModelSize::Large =>
-                ModelInfo {
-                    size: ModelSize::Large,
-                    filename: "ggml-large.bin".to_string(),
-                    display_name: "Large (1550MB, accurate)".to_string(),
-                    file_size_mb: 1550,
-                    description: "Highest accuracy, best for professional use",
-                },
+            ModelSize::Small => ModelInfo {
+                size: ModelSize::Small,
+                filename: "ggml-small.bin".to_string(),
+                display_name: "Small (39MB, fast)".to_string(),
+                file_size_mb: 39,
+                description: "Fast processing, good for quick notes",
+            },
+            ModelSize::Medium => ModelInfo {
+                size: ModelSize::Medium,
+                filename: "ggml-medium.bin".to_string(),
+                display_name: "Medium (769MB, balanced)".to_string(),
+                file_size_mb: 769,
+                description: "Balanced accuracy and speed",
+            },
+            ModelSize::Large => ModelInfo {
+                size: ModelSize::Large,
+                filename: "ggml-large.bin".to_string(),
+                display_name: "Large (1550MB, accurate)".to_string(),
+                file_size_mb: 1550,
+                description: "Highest accuracy, best for professional use",
+            },
         }
     }
+}
+
+// ============================================================================
+// Transcription Types and Configuration
+// ============================================================================
+
+// --------------------------------------------------------------------------
+/// Performance modes for transcription processing.
+///
+/// Each mode represents a different balance between processing speed,
+/// accuracy, and resource consumption during transcription.
+///
+/// # Mode Characteristics
+///
+/// - `Speed`: Optimises for fastest processing with acceptable accuracy
+/// - `Balanced`: Balanced performance between speed and accuracy (default)
+/// - `Accuracy`: Prioritises highest accuracy, longer processing time
+///
+/// # Examples
+///
+/// ```no_run
+/// use speakr_types::PerformanceMode;
+///
+/// let mode = PerformanceMode::Balanced;
+/// ```
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[serde(deny_unknown_fields)]
+pub enum PerformanceMode {
+    /// Optimised for speed with acceptable accuracy.
+    Speed,
+
+    /// Balanced performance between speed and accuracy (default).
+    #[default]
+    Balanced,
+
+    /// Prioritises highest accuracy over processing speed.
+    Accuracy,
+}
+
+// --------------------------------------------------------------------------
+/// Configuration for transcription processing behaviour.
+///
+/// Encapsulates all settings that control how transcription is performed,
+/// including model selection, language preferences, and performance tuning.
+///
+/// # Fields
+///
+/// - `model_size`: Selected Whisper model size for processing
+/// - `language`: Optional language code for processing (ISO 639-1)
+/// - `auto_detect_language`: Whether to automatically detect audio language
+/// - `performance_mode`: Processing optimisation preference
+///
+/// # Examples
+///
+/// ```no_run
+/// use speakr_types::{TranscriptionConfig, ModelSize, PerformanceMode};
+///
+/// let config = TranscriptionConfig {
+///     model_size: ModelSize::Medium,
+///     language: Some("en".to_string()),
+///     auto_detect_language: false,
+///     performance_mode: PerformanceMode::Balanced,
+/// };
+/// ```
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TranscriptionConfig {
+    /// Selected Whisper model size for processing.
+    pub model_size: ModelSize,
+    /// Optional language code for processing (ISO 639-1 format).
+    pub language: Option<String>,
+    /// Whether to automatically detect the audio language.
+    pub auto_detect_language: bool,
+    /// Processing optimisation preference.
+    pub performance_mode: PerformanceMode,
+}
+
+impl Default for TranscriptionConfig {
+    fn default() -> Self {
+        Self {
+            model_size: ModelSize::default(),
+            language: None,
+            auto_detect_language: true,
+            performance_mode: PerformanceMode::default(),
+        }
+    }
+}
+
+// --------------------------------------------------------------------------
+/// Specific error types for transcription operations.
+///
+/// Provides detailed error information for transcription failures,
+/// enabling appropriate user feedback and recovery strategies.
+///
+/// # Error Categories
+///
+/// - Model-related errors (not found, loading failed, insufficient memory)
+/// - Processing errors (transcription failed, invalid audio format)
+/// - Language-related errors (unsupported language)
+/// - Network errors (model download failed)
+///
+/// # Examples
+///
+/// ```no_run
+/// use speakr_types::{TranscriptionError, ModelSize};
+///
+/// let error = TranscriptionError::ModelNotFound {
+///     model_size: ModelSize::Large
+/// };
+/// ```
+#[derive(Error, Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum TranscriptionError {
+    /// Requested model is not available locally.
+    #[error("Model not found: {model_size:?}")]
+    ModelNotFound { model_size: ModelSize },
+
+    /// Model loading failed during initialisation.
+    #[error("Model loading failed: {0}")]
+    ModelLoadingFailed(String),
+
+    /// Transcription processing failed during execution.
+    #[error("Transcription processing failed: {0}")]
+    ProcessingFailed(String),
+
+    /// Insufficient memory available for the requested model.
+    #[error("Insufficient memory for model: {model_size:?}")]
+    InsufficientMemory { model_size: ModelSize },
+
+    /// Invalid audio format provided for transcription.
+    #[error("Invalid audio format: {0}")]
+    InvalidAudioFormat(String),
+
+    /// Language is not supported by the current model.
+    #[error("Language not supported: {language}")]
+    UnsupportedLanguage { language: String },
+
+    /// Model download from remote source failed.
+    #[error("Model download failed: {0}")]
+    DownloadFailed(String),
+}
+
+// --------------------------------------------------------------------------
+/// Individual transcription segment with timing information.
+///
+/// Represents a portion of the transcribed text with precise timing
+/// and confidence metrics for detailed analysis.
+///
+/// # Fields
+///
+/// - `text`: The transcribed text for this segment
+/// - `start_time`: Beginning timestamp of the segment
+/// - `end_time`: Ending timestamp of the segment
+/// - `confidence`: Confidence score (0.0-1.0) for this segment
+///
+/// # Examples
+///
+/// ```no_run
+/// use speakr_types::TranscriptionSegment;
+/// use std::time::Duration;
+///
+/// let segment = TranscriptionSegment {
+///     text: "Hello world".to_string(),
+///     start_time: Duration::from_millis(0),
+///     end_time: Duration::from_millis(1000),
+///     confidence: 0.95,
+/// };
+/// ```
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TranscriptionSegment {
+    /// The transcribed text for this segment.
+    pub text: String,
+    /// Beginning timestamp of the segment.
+    pub start_time: Duration,
+    /// Ending timestamp of the segment.
+    pub end_time: Duration,
+    /// Confidence score (0.0-1.0) for this segment.
+    pub confidence: f32,
+}
+
+// --------------------------------------------------------------------------
+/// Complete transcription result with metadata and segments.
+///
+/// Contains the full output of a transcription operation, including
+/// the transcribed text, confidence metrics, timing information,
+/// and detailed segment breakdown.
+///
+/// # Fields
+///
+/// - `text`: Complete transcribed text
+/// - `language`: Detected or specified language code
+/// - `confidence`: Overall confidence score (0.0-1.0)
+/// - `processing_time`: Total time taken for transcription
+/// - `model_used`: Model size that performed the transcription
+/// - `segments`: Detailed breakdown of transcription segments
+///
+/// # Examples
+///
+/// ```no_run
+/// use speakr_types::{TranscriptionResult, ModelSize};
+/// use std::time::Duration;
+///
+/// let result = TranscriptionResult {
+///     text: "Hello world".to_string(),
+///     language: Some("en".to_string()),
+///     confidence: 0.95,
+///     processing_time: Duration::from_millis(500),
+///     model_used: ModelSize::Medium,
+///     segments: vec![],
+/// };
+/// ```
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TranscriptionResult {
+    /// Complete transcribed text.
+    pub text: String,
+    /// Detected or specified language code (ISO 639-1).
+    pub language: Option<String>,
+    /// Overall confidence score (0.0-1.0) for the transcription.
+    pub confidence: f32,
+    /// Total time taken for transcription processing.
+    pub processing_time: Duration,
+    /// Model size that performed the transcription.
+    pub model_used: ModelSize,
+    /// Detailed breakdown of transcription segments with timing.
+    pub segments: Vec<TranscriptionSegment>,
 }
 
 // ============================================================================
@@ -759,9 +979,9 @@ impl BackendStatus {
     /// assert!(ready_status.is_ready());
     /// ```
     pub fn is_ready(&self) -> bool {
-        self.audio_capture.is_ready() &&
-            self.transcription.is_ready() &&
-            self.text_injection.is_ready()
+        self.audio_capture.is_ready()
+            && self.transcription.is_ready()
+            && self.text_injection.is_ready()
     }
 
     /// Creates a new status with all services in starting state.
@@ -845,15 +1065,25 @@ mod tests {
 
     #[test]
     fn test_audio_duration_validation_valid_range() {
-        assert!(AppSettings::validate_audio_duration(MIN_AUDIO_DURATION_SECS));
-        assert!(AppSettings::validate_audio_duration(DEFAULT_AUDIO_DURATION_SECS));
-        assert!(AppSettings::validate_audio_duration(MAX_AUDIO_DURATION_SECS));
+        assert!(AppSettings::validate_audio_duration(
+            MIN_AUDIO_DURATION_SECS
+        ));
+        assert!(AppSettings::validate_audio_duration(
+            DEFAULT_AUDIO_DURATION_SECS
+        ));
+        assert!(AppSettings::validate_audio_duration(
+            MAX_AUDIO_DURATION_SECS
+        ));
     }
 
     #[test]
     fn test_audio_duration_validation_invalid_range() {
-        assert!(!AppSettings::validate_audio_duration(MIN_AUDIO_DURATION_SECS - 1));
-        assert!(!AppSettings::validate_audio_duration(MAX_AUDIO_DURATION_SECS + 1));
+        assert!(!AppSettings::validate_audio_duration(
+            MIN_AUDIO_DURATION_SECS - 1
+        ));
+        assert!(!AppSettings::validate_audio_duration(
+            MAX_AUDIO_DURATION_SECS + 1
+        ));
         assert!(!AppSettings::validate_audio_duration(100));
     }
 
@@ -861,16 +1091,26 @@ mod tests {
     fn test_audio_duration_constants_are_consistent() {
         assert!(MIN_AUDIO_DURATION_SECS <= DEFAULT_AUDIO_DURATION_SECS);
         assert!(DEFAULT_AUDIO_DURATION_SECS <= MAX_AUDIO_DURATION_SECS);
-        assert!(AppSettings::validate_audio_duration(DEFAULT_AUDIO_DURATION_SECS));
+        assert!(AppSettings::validate_audio_duration(
+            DEFAULT_AUDIO_DURATION_SECS
+        ));
     }
 
     #[test]
     fn test_audio_duration_validation_uses_constants() {
         // Test that validation uses the defined constants
-        assert!(AppSettings::validate_audio_duration(MIN_AUDIO_DURATION_SECS));
-        assert!(AppSettings::validate_audio_duration(MAX_AUDIO_DURATION_SECS));
-        assert!(!AppSettings::validate_audio_duration(MIN_AUDIO_DURATION_SECS - 1));
-        assert!(!AppSettings::validate_audio_duration(MAX_AUDIO_DURATION_SECS + 1));
+        assert!(AppSettings::validate_audio_duration(
+            MIN_AUDIO_DURATION_SECS
+        ));
+        assert!(AppSettings::validate_audio_duration(
+            MAX_AUDIO_DURATION_SECS
+        ));
+        assert!(!AppSettings::validate_audio_duration(
+            MIN_AUDIO_DURATION_SECS - 1
+        ));
+        assert!(!AppSettings::validate_audio_duration(
+            MAX_AUDIO_DURATION_SECS + 1
+        ));
     }
 
     #[test]
@@ -900,9 +1140,8 @@ mod tests {
     fn test_settings_serialization() {
         let settings = AppSettings::default();
         let json = serde_json::to_string(&settings).expect("Settings should serialize to JSON");
-        let deserialized: AppSettings = serde_json
-            ::from_str(&json)
-            .expect("JSON should deserialize to settings");
+        let deserialized: AppSettings =
+            serde_json::from_str(&json).expect("JSON should deserialize to settings");
         assert_eq!(settings, deserialized);
     }
 
@@ -958,7 +1197,10 @@ mod tests {
     fn test_service_status_display() {
         assert_eq!(ServiceStatus::Ready.display_name(), "Ready");
         assert_eq!(ServiceStatus::Starting.display_name(), "Starting");
-        assert_eq!(ServiceStatus::Error("test error".to_string()).display_name(), "Error");
+        assert_eq!(
+            ServiceStatus::Error("test error".to_string()).display_name(),
+            "Error"
+        );
         assert_eq!(ServiceStatus::Unavailable.display_name(), "Unavailable");
     }
 
@@ -1017,9 +1259,8 @@ mod tests {
         };
 
         let json = serde_json::to_string(&status).expect("Status should serialize to JSON");
-        let deserialized: BackendStatus = serde_json
-            ::from_str(&json)
-            .expect("JSON should deserialize to status");
+        let deserialized: BackendStatus =
+            serde_json::from_str(&json).expect("JSON should deserialize to status");
 
         assert_eq!(deserialized.timestamp, status.timestamp);
         assert_eq!(deserialized.audio_capture, status.audio_capture);
@@ -1034,6 +1275,130 @@ mod tests {
 
         let update_starting = StatusUpdate::new_starting();
         assert!(!update_starting.is_ready());
+    }
+
+    // =========================
+    // Transcription Types Tests
+    // =========================
+
+    #[test]
+    fn test_performance_mode_default() {
+        let mode = PerformanceMode::default();
+        assert_eq!(mode, PerformanceMode::Balanced);
+    }
+
+    #[test]
+    fn test_transcription_config_default() {
+        let config = TranscriptionConfig::default();
+        assert_eq!(config.model_size, ModelSize::Medium);
+        assert_eq!(config.language, None);
+        assert!(config.auto_detect_language);
+        assert_eq!(config.performance_mode, PerformanceMode::Balanced);
+    }
+
+    #[test]
+    fn test_transcription_config_serialization() {
+        let config = TranscriptionConfig {
+            model_size: ModelSize::Large,
+            language: Some("en".to_string()),
+            auto_detect_language: false,
+            performance_mode: PerformanceMode::Accuracy,
+        };
+
+        let json = serde_json::to_string(&config).expect("Config should serialize to JSON");
+        let deserialized: TranscriptionConfig =
+            serde_json::from_str(&json).expect("JSON should deserialize to config");
+        assert_eq!(config, deserialized);
+    }
+
+    #[test]
+    fn test_transcription_error_display() {
+        let error = TranscriptionError::ModelNotFound {
+            model_size: ModelSize::Large,
+        };
+        assert!(error.to_string().contains("Model not found"));
+        assert!(error.to_string().contains("Large"));
+
+        let error2 = TranscriptionError::ProcessingFailed("Audio too short".to_string());
+        assert_eq!(
+            error2.to_string(),
+            "Transcription processing failed: Audio too short"
+        );
+    }
+
+    #[test]
+    fn test_transcription_segment_creation() {
+        let segment = TranscriptionSegment {
+            text: "Hello world".to_string(),
+            start_time: Duration::from_millis(0),
+            end_time: Duration::from_millis(1000),
+            confidence: 0.95,
+        };
+
+        assert_eq!(segment.text, "Hello world");
+        assert_eq!(segment.start_time, Duration::from_millis(0));
+        assert_eq!(segment.end_time, Duration::from_millis(1000));
+        assert_eq!(segment.confidence, 0.95);
+    }
+
+    #[test]
+    fn test_transcription_result_creation() {
+        let result = TranscriptionResult {
+            text: "Hello world".to_string(),
+            language: Some("en".to_string()),
+            confidence: 0.95,
+            processing_time: Duration::from_millis(500),
+            model_used: ModelSize::Medium,
+            segments: vec![],
+        };
+
+        assert_eq!(result.text, "Hello world");
+        assert_eq!(result.language, Some("en".to_string()));
+        assert_eq!(result.confidence, 0.95);
+        assert_eq!(result.processing_time, Duration::from_millis(500));
+        assert_eq!(result.model_used, ModelSize::Medium);
+        assert!(result.segments.is_empty());
+    }
+
+    #[test]
+    fn test_transcription_result_with_segments() {
+        let segment = TranscriptionSegment {
+            text: "Hello".to_string(),
+            start_time: Duration::from_millis(0),
+            end_time: Duration::from_millis(500),
+            confidence: 0.98,
+        };
+
+        let result = TranscriptionResult {
+            text: "Hello".to_string(),
+            language: Some("en".to_string()),
+            confidence: 0.98,
+            processing_time: Duration::from_millis(200),
+            model_used: ModelSize::Small,
+            segments: vec![segment.clone()],
+        };
+
+        assert_eq!(result.segments.len(), 1);
+        assert_eq!(result.segments[0], segment);
+    }
+
+    #[test]
+    fn test_transcription_types_serialization() {
+        // Test PerformanceMode serialization
+        let mode = PerformanceMode::Speed;
+        let json = serde_json::to_string(&mode).expect("PerformanceMode should serialize");
+        let deserialized: PerformanceMode =
+            serde_json::from_str(&json).expect("JSON should deserialize to PerformanceMode");
+        assert_eq!(mode, deserialized);
+
+        // Test TranscriptionError serialization
+        let error = TranscriptionError::UnsupportedLanguage {
+            language: "xyz".to_string(),
+        };
+        let json = serde_json::to_string(&error).expect("TranscriptionError should serialize");
+        let deserialized: TranscriptionError =
+            serde_json::from_str(&json).expect("JSON should deserialize to TranscriptionError");
+        assert_eq!(error, deserialized);
     }
 }
 
