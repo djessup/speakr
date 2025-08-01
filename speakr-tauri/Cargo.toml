@@ -19,7 +19,7 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 speakr-types = { path = "../speakr-types" } # Shared data types
-speakr-core = { path = "../speakr-core" } # Audio recording functionality
+speakr-core = { path = "../speakr-core" }   # Audio recording functionality
 
 tauri = { version = "2", features = [] }
 tauri-plugin-opener = "2"
@@ -28,6 +28,7 @@ tauri-plugin-store = "2"
 thiserror = "2" # Error handling for hot-key operations
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+serde_path_to_error = "0.1" # Better error messages for JSON parsing
 dirs = "6.0" # Cross-platform directory access
 tracing = "0.1.41"
 tokio = { version = "1", features = [
@@ -48,11 +49,14 @@ mockall = "0.13" # Mock generation for testing (used in test_utils module)
 
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
-tempfile = "3.0"                                                    # Temporary directories for testing
-tauri = { version = "2", features = ["test", "tracing"] }           # Test utilities for Tauri
+tempfile = "3.0" # Temporary directories for testing
+tauri = { version = "2", features = [
+  "test",
+  "tracing",
+] } # Test utilities for Tauri
 tauri-plugin-devtools = "2"
 
-futures = "0.3"                                                     # Future utilities for parallel testing
+futures = "0.3" # Future utilities for parallel testing
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-global-shortcut = "2"

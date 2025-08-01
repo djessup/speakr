@@ -5,7 +5,7 @@
 use crate::settings::{
     migration::migrate_settings, validation::validate_settings_directory_permissions,
 };
-use speakr_types::{AppError, AppSettings, DEFAULT_AUDIO_DURATION_SECS};
+use speakr_types::{AppError, AppSettings, DEFAULT_AUDIO_DURATION_SECS, MAX_SETTINGS_FILE_SIZE};
 use std::fs;
 use std::path::PathBuf;
 use tracing::{error, info, warn};
@@ -57,11 +57,24 @@ pub fn get_settings_backup_path() -> Result<PathBuf, AppError> {
 /// # Internal API
 /// This function is only intended for internal use and testing.
 pub fn try_load_settings_file(path: &PathBuf) -> Result<AppSettings, String> {
+    // Check file size before reading to prevent DoS attacks
+    let metadata =
+        fs::metadata(path).map_err(|e| format!("Failed to read settings file metadata: {e}"))?;
+
+    if metadata.len() > (MAX_SETTINGS_FILE_SIZE as u64) {
+        return Err(format!(
+            "Settings file too large: {} bytes (max: {} bytes)",
+            metadata.len(),
+            MAX_SETTINGS_FILE_SIZE
+        ));
+    }
+
     let content =
         fs::read_to_string(path).map_err(|e| format!("Failed to read settings file: {e}"))?;
 
-    let mut settings: AppSettings = serde_json::from_str(&content)
-        .map_err(|e| format!("Failed to parse settings JSON: {e}"))?;
+    let mut settings: AppSettings =
+        serde_path_to_error::deserialize(&mut serde_json::Deserializer::from_str(&content))
+            .map_err(|e| format!("Failed to parse settings JSON: {e}"))?;
 
     if !AppSettings::validate_audio_duration(settings.audio_duration_secs) {
         warn!(

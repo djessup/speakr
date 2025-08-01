@@ -7,6 +7,7 @@ use speakr_core::audio::AudioRecorder;
 
 /// Debug log levels for categorizing log messages
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub enum DebugLogLevel {
     Trace,
     Debug,
@@ -17,6 +18,7 @@ pub enum DebugLogLevel {
 
 /// A debug log message with timestamp and context
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct DebugLogMessage {
     pub timestamp: String,
     pub level: DebugLogLevel,

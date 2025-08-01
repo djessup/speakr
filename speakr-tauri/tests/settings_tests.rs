@@ -163,8 +163,9 @@ async fn test_settings_serialization() {
         audio_duration_secs: 10,
     };
 
-    let json = serde_json::to_string(&settings).unwrap();
-    let deserialized: AppSettings = serde_json::from_str(&json).unwrap();
+    let json = serde_json::to_string(&settings).expect("Settings should serialize to JSON");
+    let deserialized: AppSettings =
+        serde_json::from_str(&json).expect("JSON should deserialize to settings");
 
     assert_eq!(settings, deserialized);
 }

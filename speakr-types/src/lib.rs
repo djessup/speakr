@@ -23,7 +23,7 @@
 // =========================
 // External Imports
 // =========================
-use serde::{Deserialize, Serialize};
+use serde::{ Deserialize, Serialize };
 use thiserror::Error;
 
 // ============================================================================
@@ -69,6 +69,12 @@ pub const MAX_AUDIO_DURATION_SECS: u32 = 30;
 /// Set to 10 seconds to match current behaviour while providing
 /// reasonable balance between capturing complete thoughts and memory usage.
 pub const DEFAULT_AUDIO_DURATION_SECS: u32 = 10;
+
+/// Maximum allowed settings file size in bytes.
+///
+/// Set to 64KB to prevent DoS attacks while allowing reasonable settings growth.
+/// A typical settings file should be under 1KB, so this provides generous headroom.
+pub const MAX_SETTINGS_FILE_SIZE: usize = 64 * 1024;
 
 // ============================================================================
 // Error Types and Error Handling
@@ -194,6 +200,7 @@ pub enum HotkeyError {
 /// };
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub struct HotkeyConfig {
     /// The hotkey combination string in Tauri format.
     pub shortcut: String,
@@ -243,6 +250,7 @@ impl Default for HotkeyConfig {
 /// };
 /// ```
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct AppSettings {
     /// Schema version for migration support.
     #[serde(default = "default_schema_version")]
@@ -308,6 +316,49 @@ impl AppSettings {
         (MIN_AUDIO_DURATION_SECS..=MAX_AUDIO_DURATION_SECS).contains(&duration_secs)
     }
 
+    /// Validates that a file path is safe and doesn't contain path traversal attempts.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - The file path string to validate
+    ///
+    /// # Returns
+    ///
+    /// `true` if the path is safe, `false` if it contains suspicious patterns.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use speakr_types::AppSettings;
+    ///
+    /// assert!(AppSettings::validate_file_path("models/whisper.bin"));
+    /// assert!(!AppSettings::validate_file_path("../../../etc/passwd"));
+    /// assert!(!AppSettings::validate_file_path("/absolute/path"));
+    /// ```
+    pub fn validate_file_path(path: &str) -> bool {
+        // Reject paths with traversal attempts
+        if path.contains("..") {
+            return false;
+        }
+
+        // Reject absolute paths (should be relative to app directory)
+        if path.starts_with('/') || path.starts_with('\\') {
+            return false;
+        }
+
+        // Reject Windows drive letters
+        if path.len() >= 2 && path.chars().nth(1) == Some(':') {
+            return false;
+        }
+
+        // Reject null bytes and other control characters
+        if path.chars().any(|c| c.is_control()) {
+            return false;
+        }
+
+        true
+    }
+
     /// Validates all fields in the AppSettings structure.
     ///
     /// # Returns
@@ -327,10 +378,14 @@ impl AppSettings {
     /// ```
     pub fn validate(&self) -> Result<(), String> {
         if !Self::validate_audio_duration(self.audio_duration_secs) {
-            return Err(format!(
-                "Invalid audio duration: {} seconds. Must be between {} and {} seconds.",
-                self.audio_duration_secs, MIN_AUDIO_DURATION_SECS, MAX_AUDIO_DURATION_SECS
-            ));
+            return Err(
+                format!(
+                    "Invalid audio duration: {} seconds. Must be between {} and {} seconds.",
+                    self.audio_duration_secs,
+                    MIN_AUDIO_DURATION_SECS,
+                    MAX_AUDIO_DURATION_SECS
+                )
+            );
         }
 
         // Add other validation checks here as needed
@@ -365,6 +420,7 @@ impl AppSettings {
 /// assert_eq!(size.to_string_value(), "medium");
 /// ```
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[serde(deny_unknown_fields)]
 pub enum ModelSize {
     /// Small model: 39MB, optimised for speed.
     Small,
@@ -490,6 +546,7 @@ impl ModelSize {
 /// assert_eq!(info.file_size_mb, 769);
 /// ```
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ModelInfo {
     /// The model size variant.
     pub size: ModelSize,
@@ -524,27 +581,30 @@ impl ModelInfo {
     /// ```
     pub fn for_size(size: ModelSize) -> Self {
         match size {
-            ModelSize::Small => ModelInfo {
-                size: ModelSize::Small,
-                filename: "ggml-small.bin".to_string(),
-                display_name: "Small (39MB, fast)".to_string(),
-                file_size_mb: 39,
-                description: "Fast processing, good for quick notes",
-            },
-            ModelSize::Medium => ModelInfo {
-                size: ModelSize::Medium,
-                filename: "ggml-medium.bin".to_string(),
-                display_name: "Medium (769MB, balanced)".to_string(),
-                file_size_mb: 769,
-                description: "Balanced accuracy and speed",
-            },
-            ModelSize::Large => ModelInfo {
-                size: ModelSize::Large,
-                filename: "ggml-large.bin".to_string(),
-                display_name: "Large (1550MB, accurate)".to_string(),
-                file_size_mb: 1550,
-                description: "Highest accuracy, best for professional use",
-            },
+            ModelSize::Small =>
+                ModelInfo {
+                    size: ModelSize::Small,
+                    filename: "ggml-small.bin".to_string(),
+                    display_name: "Small (39MB, fast)".to_string(),
+                    file_size_mb: 39,
+                    description: "Fast processing, good for quick notes",
+                },
+            ModelSize::Medium =>
+                ModelInfo {
+                    size: ModelSize::Medium,
+                    filename: "ggml-medium.bin".to_string(),
+                    display_name: "Medium (769MB, balanced)".to_string(),
+                    file_size_mb: 769,
+                    description: "Balanced accuracy and speed",
+                },
+            ModelSize::Large =>
+                ModelInfo {
+                    size: ModelSize::Large,
+                    filename: "ggml-large.bin".to_string(),
+                    display_name: "Large (1550MB, accurate)".to_string(),
+                    file_size_mb: 1550,
+                    description: "Highest accuracy, best for professional use",
+                },
         }
     }
 }
@@ -579,6 +639,7 @@ impl ModelInfo {
 /// assert!(!error_status.is_ready());
 /// ```
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub enum ServiceStatus {
     /// Service is ready and operational.
     Ready,
@@ -670,6 +731,7 @@ impl ServiceStatus {
 /// assert!(!partial_status.is_ready());
 /// ```
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct BackendStatus {
     /// Status of audio capture service (microphone access).
     pub audio_capture: ServiceStatus,
@@ -697,9 +759,9 @@ impl BackendStatus {
     /// assert!(ready_status.is_ready());
     /// ```
     pub fn is_ready(&self) -> bool {
-        self.audio_capture.is_ready()
-            && self.transcription.is_ready()
-            && self.text_injection.is_ready()
+        self.audio_capture.is_ready() &&
+            self.transcription.is_ready() &&
+            self.text_injection.is_ready()
     }
 
     /// Creates a new status with all services in starting state.
@@ -783,25 +845,15 @@ mod tests {
 
     #[test]
     fn test_audio_duration_validation_valid_range() {
-        assert!(AppSettings::validate_audio_duration(
-            MIN_AUDIO_DURATION_SECS
-        ));
-        assert!(AppSettings::validate_audio_duration(
-            DEFAULT_AUDIO_DURATION_SECS
-        ));
-        assert!(AppSettings::validate_audio_duration(
-            MAX_AUDIO_DURATION_SECS
-        ));
+        assert!(AppSettings::validate_audio_duration(MIN_AUDIO_DURATION_SECS));
+        assert!(AppSettings::validate_audio_duration(DEFAULT_AUDIO_DURATION_SECS));
+        assert!(AppSettings::validate_audio_duration(MAX_AUDIO_DURATION_SECS));
     }
 
     #[test]
     fn test_audio_duration_validation_invalid_range() {
-        assert!(!AppSettings::validate_audio_duration(
-            MIN_AUDIO_DURATION_SECS - 1
-        ));
-        assert!(!AppSettings::validate_audio_duration(
-            MAX_AUDIO_DURATION_SECS + 1
-        ));
+        assert!(!AppSettings::validate_audio_duration(MIN_AUDIO_DURATION_SECS - 1));
+        assert!(!AppSettings::validate_audio_duration(MAX_AUDIO_DURATION_SECS + 1));
         assert!(!AppSettings::validate_audio_duration(100));
     }
 
@@ -809,26 +861,16 @@ mod tests {
     fn test_audio_duration_constants_are_consistent() {
         assert!(MIN_AUDIO_DURATION_SECS <= DEFAULT_AUDIO_DURATION_SECS);
         assert!(DEFAULT_AUDIO_DURATION_SECS <= MAX_AUDIO_DURATION_SECS);
-        assert!(AppSettings::validate_audio_duration(
-            DEFAULT_AUDIO_DURATION_SECS
-        ));
+        assert!(AppSettings::validate_audio_duration(DEFAULT_AUDIO_DURATION_SECS));
     }
 
     #[test]
     fn test_audio_duration_validation_uses_constants() {
         // Test that validation uses the defined constants
-        assert!(AppSettings::validate_audio_duration(
-            MIN_AUDIO_DURATION_SECS
-        ));
-        assert!(AppSettings::validate_audio_duration(
-            MAX_AUDIO_DURATION_SECS
-        ));
-        assert!(!AppSettings::validate_audio_duration(
-            MIN_AUDIO_DURATION_SECS - 1
-        ));
-        assert!(!AppSettings::validate_audio_duration(
-            MAX_AUDIO_DURATION_SECS + 1
-        ));
+        assert!(AppSettings::validate_audio_duration(MIN_AUDIO_DURATION_SECS));
+        assert!(AppSettings::validate_audio_duration(MAX_AUDIO_DURATION_SECS));
+        assert!(!AppSettings::validate_audio_duration(MIN_AUDIO_DURATION_SECS - 1));
+        assert!(!AppSettings::validate_audio_duration(MAX_AUDIO_DURATION_SECS + 1));
     }
 
     #[test]
@@ -857,8 +899,10 @@ mod tests {
     #[test]
     fn test_settings_serialization() {
         let settings = AppSettings::default();
-        let json = serde_json::to_string(&settings).unwrap();
-        let deserialized: AppSettings = serde_json::from_str(&json).unwrap();
+        let json = serde_json::to_string(&settings).expect("Settings should serialize to JSON");
+        let deserialized: AppSettings = serde_json
+            ::from_str(&json)
+            .expect("JSON should deserialize to settings");
         assert_eq!(settings, deserialized);
     }
 
@@ -914,10 +958,7 @@ mod tests {
     fn test_service_status_display() {
         assert_eq!(ServiceStatus::Ready.display_name(), "Ready");
         assert_eq!(ServiceStatus::Starting.display_name(), "Starting");
-        assert_eq!(
-            ServiceStatus::Error("test error".to_string()).display_name(),
-            "Error"
-        );
+        assert_eq!(ServiceStatus::Error("test error".to_string()).display_name(), "Error");
         assert_eq!(ServiceStatus::Unavailable.display_name(), "Unavailable");
     }
 
@@ -975,8 +1016,10 @@ mod tests {
             timestamp: 67890,
         };
 
-        let json = serde_json::to_string(&status).unwrap();
-        let deserialized: BackendStatus = serde_json::from_str(&json).unwrap();
+        let json = serde_json::to_string(&status).expect("Status should serialize to JSON");
+        let deserialized: BackendStatus = serde_json
+            ::from_str(&json)
+            .expect("JSON should deserialize to status");
 
         assert_eq!(deserialized.timestamp, status.timestamp);
         assert_eq!(deserialized.audio_capture, status.audio_capture);
