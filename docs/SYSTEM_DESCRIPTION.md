@@ -71,6 +71,8 @@ Use a Cargo workspace so all three crates share versions and CI.
   comprehensive security measures
 - **Global Hotkey**: System-wide hotkey registration with conflict detection
 - **Audio Capture**: 16kHz mono recording with configurable duration (1-30 seconds)
+- **Transcription Module Structure**: Complete module organisation with engine, models, language,
+  and performance submodules ready for whisper-rs integration
 - **Workflow Orchestration**: Complete pipeline integration with error handling
 - **Testing Infrastructure**: Comprehensive test coverage with TDD practices
 - **Security Framework**: Input validation, DoS protection, and secure data handling

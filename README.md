@@ -20,8 +20,8 @@ using Whisper models.
 
 This workspace contains four main crates:
 
-- **[`speakr-core/`](speakr-core/)** - Core functionality (Whisper transcription, audio capture,
-  text injection)
+- **[`speakr-core/`](speakr-core/)** - Core functionality (audio capture, Whisper transcription
+  engine with language detection, text injection)
 - **[`speakr-tauri/`](speakr-tauri/)** - Tauri backend (global hotkeys, settings management, event
   handling)
 - **[`speakr-ui/`](speakr-ui/)** - Frontend UI (Leptos components and styling)
@@ -136,8 +136,9 @@ allowing the UI to be closed without disabling dictation functionality.
 │   (Leptos)      │◄──►│   (Backend)     │◄──►│ (Transcription) │
 │                 │    │                 │    │                 │
 │ • Settings UI   │    │ • Global hotkey │    │ • Audio capture │
-│ • Status display│    │ • IPC bridge    │    │ • Whisper AI    │
-│ • Controls      │    │ • Event system  │    │ • Text injection│
+│ • Status display│    │ • IPC bridge    │    │ • Whisper engine│
+│ • Controls      │    │ • Event system  │    │ • Language detect│
+│                 │    │                 │    │ • Text injection│
 └─────────────────┘    └─────────────────┘    └─────────────────┘
 ```
 
