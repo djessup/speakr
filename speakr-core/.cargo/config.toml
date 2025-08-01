@@ -1,0 +1,3 @@
+# Cargo configuration for the Speakr project
+[target.aarch64-apple-darwin]
+rustflags = "-l framework=Accelerate" # for whisper-rs
