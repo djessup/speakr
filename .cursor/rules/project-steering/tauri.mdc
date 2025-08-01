@@ -1,0 +1,112 @@
+---
+description: Use `cargo tauri` for plugin management, register plugins in code, define backend commands with `#[tauri::command]` (never `pub`), and enforce strict security and IPC patterns. Use Context7 tool to access accurate Tauri documentation, code examples, and best practices.
+alwaysApply: false
+---
+<tauri_framework>
+
+<commands>
+- `cargo tauri dev`: Launch dev server (frontend + backend).
+</commands>
+
+<tauri_plugins>
+- List available plugins:
+  ```bash
+  cargo tauri plugin list
+  ```
+- Add plugins via:
+  ```sh
+  cargo tauri add <plugin-name>
+  ```
+- Register plugins in `speakr-tauri/src/main.rs`:
+  ```rust
+  .plugin(tauri_plugin_<name>::init())
+  ```
+</tauri_plugins>
+
+<security>
+- Use `invoke()` from frontend; do **not** expose raw APIs directly.
+- Define safe backend functions with `#[tauri::command]`.
+- Set strict `CSP` under `tauri.conf.json > security`.
+- Disable `devTools` in production builds unless explicitly required.
+</security>
+
+<backend_commands_ipc>
+Use Leptos `ServerFn` or Tauri commands depending on interop style:
+
+<backend_defintion>
+Define command:
+```rust
+#[tauri::command]
+fn my_command(input: String) -> String {
+    format!("Received: {}", input)
+}
+```
+**Important: Commands CANNOT be `pub`!**
+
+Register the command:
+```rust
+.invoke_handler(tauri::generate_handler![my_command])
+```
+
+<command_wrappers_pattern>
+When refactoring Tauri commands into modules, keep `#[tauri::command]` wrappers in `src/lib.rs` and move the implementation logic to internal module functions.
+
+```rust
+// src/lib.rs
+#[tauri::command]
+async fn save_settings(settings: AppSettings) -> Result<(), AppError> {
+    crate::settings::commands::save_settings_internal(settings).await
+}
+
+// settings/commands.rs
+pub(crate) async fn save_settings_internal(settings: AppSettings) -> Result<(), AppError> {
+    // ...
+}
+```
+
+Why this pattern?
+- Ensures the command remains registered via `tauri::generate_handler![]`.
+- Keeps `lib.rs` thin while enabling modular organisation.
+- Preserves stable frontend APIs and simplifies unit testing of core logic.
+
+Avoid moving the `#[tauri::command]` attribute into other modules – registration will fail.
+</command_wrappers_pattern>
+</backend_defintion>
+
+<frontend_invoke>
+Call from Leptos using `tauri::invoke` crate:
+```rust
+let response: String = tauri::invoke("my_command", &params).await?;
+```
+</frontend_invoke>
+
+
+> Use only when server functions aren’t sufficient.
+</backend_commands_ipc>
+
+<packaging>
+- Use `cargo tauri build` for cross-platform bundles.
+  - only when full release is needed. these are expensive to build.
+- Customize output (e.g., `.app`, `.exe`, `.deb`) via `tauri.conf.json > bundle`.
+</packaging>
+
+<logging>
+- Set log level:
+  ```bash
+  RUST_LOG=debug cargo tauri dev
+  ```
+- Use `tauri::api::dialog` in Rust or `console.log` in JS for debug output.
+- Check for backend panics or plugin misconfig via terminal output.
+</logging>
+
+<pitfalls>
+- Forgetting to `.save()` changes when using `tauri-plugin-store`.
+- Incorrect `distDir` causes missing frontend during build.
+- Plugin registration missing from `main.rs` = silent failure.
+</pitfalls>
+
+<remember>
+Use Context7 tool to access accurate Tauri documentation, code examples, and best practices.
+</remember>
+
+</tauri_framework>

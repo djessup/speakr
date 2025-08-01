@@ -1,0 +1,12 @@
+---
+description: Use the Context7 tool when you need code examples, setup or configuration steps, or library/API documentation
+globs:
+alwaysApply: false
+mcpConfig: "Context7": { "command": "npx", "args": ["-y", "@upstash/context7-mcp" ] }
+---
+<recommended_tool tool_name="Context7">
+- The model MAY use the Context7 tool to get up-to-date library and API documentation, code
+samples, setup instructions, and other usage information.
+- The model SHOULD use Context7 if an initial attempt to use a library or framework fails This will
+  save time and make the user very happy.
+</recommended_tool>

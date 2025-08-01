@@ -1,0 +1,22 @@
+---
+description: When you need the current date or time for documentation, or any other purpose, use the available Time tools.
+globs:
+alwaysApply: false
+mcpServer: "Time": { "command": "uvx", "args": ["mcp-server-time"] }
+---
+<time_tool type="rule" name="agent-time-tool">
+**ALWAYS use the available Time tools when referencing the current date or time in documentation, code, or any other text.**
+
+If you don't use the tools, you will make mistakes and frustrate the user.
+
+## 1. Get Current Time: `get_current_time`
+**Use when you need the current date or time.**
+
+## 2. Convert Time: `convert_time`
+**Use when converting between timezones.**
+
+## 3. Fallback tool: Terminal/CLI
+**Use command line tools as a fallback if the Time tools are not available or not working.**
+- On macOS or Linux, use `date` to get the current date and time.
+- On Windows, use `cmd /c "date /t && time /t"` to get the current date and time.
+</time_tool>

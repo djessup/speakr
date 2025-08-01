@@ -1,0 +1,41 @@
+# Tauri Command Wrapper Pattern
+
+When refactoring Tauri commands into modules, use this wrapper pattern:
+
+## Keep Commands in lib.rs
+
+```rust
+// In lib.rs - ALWAYS keep #[tauri::command] wrappers here
+#[tauri::command]
+async fn save_settings(settings: AppSettings) -> Result<(), AppError> {
+    crate::settings::commands::save_settings_internal(settings).await
+}
+
+#[tauri::command]
+async fn get_backend_status() -> Result<StatusUpdate, AppError> {
+    crate::services::status::get_backend_status_internal().await
+}
+```
+
+## Extract Implementation to Modules
+
+```rust
+// In settings/commands.rs - Extract the actual logic
+pub(crate) async fn save_settings_internal(settings: AppSettings) -> Result<(), AppError> {
+    let settings_path = get_settings_path()?;
+    let settings_dir = settings_path.parent().unwrap().to_path_buf();
+    save_settings_to_dir(&settings, &settings_dir).await
+}
+```
+
+## Why This Pattern?
+
+- ✅ Keeps Tauri command registration working in `generate_handler![]`
+- ✅ Allows modular organization of implementation logic
+- ✅ Maintains thin lib.rs with just coordination code
+- ✅ Preserves existing command signatures for frontend compatibility
+
+## Wrong Approach
+
+❌ Moving `#[tauri::command]` to modules breaks command registration
+❌ Changing command signatures breaks frontend integration
