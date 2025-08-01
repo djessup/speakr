@@ -1,0 +1,234 @@
+---
+alwaysApply: true
+---
+
+# Project Structure & Organization
+
+## Workspace Layout
+
+Speakr uses a Cargo workspace with 4 main crates organized by responsibility:
+
+```text
+speakr/
+├── speakr-core/           # Core functionality (audio, transcription, injection)
+├── speakr-tauri/          # Tauri backend (hotkeys, settings, IPC)
+├── speakr-ui/             # Leptos frontend (WASM UI components)
+├── speakr-types/          # Shared types and data structures
+├── docs/                  # Documentation (mdBook)
+├── book/                  # mdBook configuration and themes
+└── scripts/               # Build and utility scripts
+```
+
+## Crate Responsibilities
+
+### speakr-core/
+
+- Audio capture via cpal (16kHz mono)
+- Whisper model management and transcription
+- Text injection via enigo
+- **No UI dependencies** - pure business logic
+
+### speakr-tauri/
+
+- Global hotkey registration
+- Settings persistence and validation
+- Tauri command handlers
+- System integration (auto-launch, permissions)
+- **Organized by domain**: commands/, services/, settings/, debug/
+
+### speakr-ui/
+
+- Leptos components compiled to WASM
+- Settings forms and status displays
+- Debug panels (debug builds only)
+- **Embedded in Tauri** but can run standalone
+
+### speakr-types/
+
+- Shared data structures (AppSettings, StatusUpdate, etc.)
+- Error types (AppError)
+- Event definitions for IPC
+
+## Code Organization Patterns
+
+### Module Structure
+
+```rust
+// Standard module layout for all crates
+mod module_name;           // Module declarations first
+use external::crate;       // External imports
+use crate::internal;       // Internal imports
+// Implementation follows
+```
+
+### Tauri Backend Structure
+
+```text
+speakr-tauri/src/
+├── commands/             # Tauri command implementations
+│   ├── mod.rs            # Command organization
+│   ├── validation.rs     # Input validation
+│   ├── system.rs         # System integration
+│   └── legacy.rs         # Backward compatibility
+├── services/             # Background services
+│   ├── hotkey.rs         # Global hotkey management
+│   ├── status.rs         # Service status tracking
+│   └── types.rs          # Service-specific types
+├── settings/             # Configuration management
+│   ├── persistence.rs    # File I/O operations
+│   ├── migration.rs      # Schema migration
+│   └── validation.rs     # Settings validation
+└── debug/                # Debug-only functionality
+```
+
+## File Naming Conventions
+
+- **Rust files**: `snake_case.rs`
+- **Test files**: `*_tests.rs` (in tests/ directory)
+- **Documentation**: `UPPERCASE.md` for main docs, `lowercase.md` for specs
+- **Configuration**: Standard names (Cargo.toml, tauri.conf.json, etc.)
+
+## Documentation Structure
+
+```text
+docs/
+├── ARCHITECTURE.md      # Technical architecture
+├── PRD.md               # Product requirements
+├── DEVELOPMENT.md       # Development setup
+├── specs/               # Feature specifications
+│   ├── FR-*.md          # Functional requirements
+│   ├── NFR-*.md         # Non-functional requirements
+│   └── reports/         # Implementation reports
+└── refactor/            # Refactoring documentation
+```
+
+## Testing Organization
+
+- **Unit tests**: Inline with `#[cfg(test)]` modules
+- **Integration tests**: `crate/tests/` directory
+- **Test isolation**: Use `tempfile::TempDir` for filesystem tests
+- **Test naming**: `test_*` functions with descriptive names
+
+## Key Architectural Principles
+
+1. **Separation of concerns**: Business logic in `*_internal()` functions, Tauri integration
+   separate
+2. **Testability**: Internal functions testable without Tauri runtime
+3. **Modularity**: Commands grouped by functional domain
+4. **Privacy**: No network access, all processing local
+5. **Error handling**: Comprehensive `Result<T, AppError>` usage
+# Project Structure & Organization
+
+## Workspace Layout
+
+Speakr uses a Cargo workspace with 4 main crates organized by responsibility:
+
+```text
+speakr/
+├── speakr-core/           # Core functionality (audio, transcription, injection)
+├── speakr-tauri/          # Tauri backend (hotkeys, settings, IPC)
+├── speakr-ui/             # Leptos frontend (WASM UI components)
+├── speakr-types/          # Shared types and data structures
+├── docs/                  # Documentation (mdBook)
+├── book/                  # mdBook configuration and themes
+└── scripts/               # Build and utility scripts
+```
+
+## Crate Responsibilities
+
+### speakr-core/
+
+- Audio capture via cpal (16kHz mono)
+- Whisper model management and transcription
+- Text injection via enigo
+- **No UI dependencies** - pure business logic
+
+### speakr-tauri/
+
+- Global hotkey registration
+- Settings persistence and validation
+- Tauri command handlers
+- System integration (auto-launch, permissions)
+- **Organized by domain**: commands/, services/, settings/, debug/
+
+### speakr-ui/
+
+- Leptos components compiled to WASM
+- Settings forms and status displays
+- Debug panels (debug builds only)
+- **Embedded in Tauri** but can run standalone
+
+### speakr-types/
+
+- Shared data structures (AppSettings, StatusUpdate, etc.)
+- Error types (AppError)
+- Event definitions for IPC
+
+## Code Organization Patterns
+
+### Module Structure
+
+```rust
+// Standard module layout for all crates
+mod module_name;           // Module declarations first
+use external::crate;       // External imports
+use crate::internal;       // Internal imports
+// Implementation follows
+```
+
+### Tauri Backend Structure
+
+```text
+speakr-tauri/src/
+├── commands/             # Tauri command implementations
+│   ├── mod.rs            # Command organization
+│   ├── validation.rs     # Input validation
+│   ├── system.rs         # System integration
+│   └── legacy.rs         # Backward compatibility
+├── services/             # Background services
+│   ├── hotkey.rs         # Global hotkey management
+│   ├── status.rs         # Service status tracking
+│   └── types.rs          # Service-specific types
+├── settings/             # Configuration management
+│   ├── persistence.rs    # File I/O operations
+│   ├── migration.rs      # Schema migration
+│   └── validation.rs     # Settings validation
+└── debug/                # Debug-only functionality
+```
+
+## File Naming Conventions
+
+- **Rust files**: `snake_case.rs`
+- **Test files**: `*_tests.rs` (in tests/ directory)
+- **Documentation**: `UPPERCASE.md` for main docs, `lowercase.md` for specs
+- **Configuration**: Standard names (Cargo.toml, tauri.conf.json, etc.)
+
+## Documentation Structure
+
+```text
+docs/
+├── ARCHITECTURE.md      # Technical architecture
+├── PRD.md               # Product requirements
+├── DEVELOPMENT.md       # Development setup
+├── specs/               # Feature specifications
+│   ├── FR-*.md          # Functional requirements
+│   ├── NFR-*.md         # Non-functional requirements
+│   └── reports/         # Implementation reports
+└── refactor/            # Refactoring documentation
+```
+
+## Testing Organization
+
+- **Unit tests**: Inline with `#[cfg(test)]` modules
+- **Integration tests**: `crate/tests/` directory
+- **Test isolation**: Use `tempfile::TempDir` for filesystem tests
+- **Test naming**: `test_*` functions with descriptive names
+
+## Key Architectural Principles
+
+1. **Separation of concerns**: Business logic in `*_internal()` functions, Tauri integration
+   separate
+2. **Testability**: Internal functions testable without Tauri runtime
+3. **Modularity**: Commands grouped by functional domain
+4. **Privacy**: No network access, all processing local
+5. **Error handling**: Comprehensive `Result<T, AppError>` usage

@@ -1,0 +1,271 @@
+---
+alwaysApply: true
+---
+# TDD Practices
+
+**CRITICAL**: All functionality MUST follow TDD. Implementation-first prohibited.
+
+## Red-Green-Refactor Cycle
+
+1. **RED**: Never code before test. Test must fail for the right reason and be specific, focused,
+   describe one behaviour.
+2. **GREEN**: Write minimal code to pass test.
+3. **REFACTOR**: Improve design while keeping tests green. Extract functions, improve naming,
+   de-duplicate.
+
+## Design for Testability
+
+### Dependency Injection
+
+Write functions to accept dependencies, don't hard-code:
+
+```rust
+// ❌ BAD
+async fn process_data() -> Result<Data, Error> {
+    let settings = load_settings_internal().await?;  // Hard-coded
+}
+
+// ✅ GOOD
+async fn process_data<S: SettingsLoader>(loader: S) -> Result<Data, Error> {
+    let settings = loader.load().await?;
+}
+```
+
+### Trait Abstractions
+
+Use traits for external dependencies to allow mocking:
+
+```rust
+#[async_trait]
+trait SettingsLoader {
+    async fn load(&self) -> Result<AppSettings, AppError>;
+}
+```
+
+### Separate Pure Logic from I/O
+
+Create traits for external dependencies to enable mocking:
+
+```rust
+fn calculate_hotkey_config(settings: &AppSettings) -> HotkeyConfig { /* Pure logic */ }
+async fn register_hotkey<S, R>(loader: S, registrar: R) -> Result<(), AppError> { /* I/O */ }
+```
+
+## Test Structure
+
+### Organisation & Naming
+
+- One test file per module: `module_name_tests.rs`
+- Name: `test_[function]_[scenario]_[result]()`
+- Use AAA pattern: Arrange, Act, Assert
+
+```rust
+#[test]
+fn test_load_settings_with_valid_file_returns_settings() {
+    // Arrange
+    let mut mock = MockDependency::new();
+    mock.expect_method().returning(|| Ok(output));
+
+    // Act
+    let result = function_under_test(mock);
+
+    // Assert
+    assert!(result.is_ok());
+}
+```
+
+## Tauri Testing Patterns
+
+Ref: <https://v2.tauri.app/develop/tests/mocking/>
+
+### Key Rules
+
+- Test `*_internal` functions, not Tauri command wrappers
+- Separate business logic from AppHandle dependencies
+- Use `mockall` for trait mocking with dependency injection
+- Use `tempfile::TempDir` for isolated filesystem tests
+- Each test must be independent
+- Avoid testing Tauri framework - focus on business logic
+
+### Unit Testing Tauri Commands
+
+```rust
+// ✅ GOOD - Test internal function
+use speakr_lib::commands::settings::save_settings_internal;
+
+#[tokio::test]
+async fn test_save_settings_internal_success() {
+    let temp_dir = TempDir::new().expect("Failed to create temp directory");
+    let settings = AppSettings::default();
+    let result = save_settings_internal(settings).await;
+    assert!(result.is_ok());
+}
+
+// ❌ AVOID - Don't test Tauri command wrappers directly
+// #[test] fn test_save_settings_tauri_command() { ... }
+```
+
+### Separating Business Logic from Tauri Context
+
+```rust
+// ✅ GOOD - Testable business logic
+async fn register_hotkey_logic<R: HotkeyRegistrar>(
+    registrar: R,
+    config: HotkeyConfig,
+) -> Result<(), String> {
+    registrar.register(&config).await  // Pure business logic
+}
+
+// Tauri command wrapper (minimal, hard to test)
+#[tauri::command]
+async fn register_hotkey(app_handle: AppHandle, config: HotkeyConfig) -> Result<(), String> {
+    let registrar = GlobalHotkeyService::new(app_handle)?;
+    register_hotkey_logic(registrar, config).await
+}
+```
+
+### Mocking External Dependencies
+
+```rust
+use mockall::predicate::*;
+use mockall::mock;
+
+mock! {
+    SettingsLoader {}
+
+    #[async_trait]
+    impl SettingsLoader for SettingsLoader {
+        async fn load(&self) -> Result<AppSettings, AppError>;
+    }
+}
+
+#[tokio::test]
+async fn test_function_with_mocked_dependency() {
+    let mut mock_loader = MockSettingsLoader::new();
+    mock_loader.expect_load()
+        .times(1)
+        .returning(|| Ok(AppSettings::default()));
+
+    let result = function_under_test(mock_loader).await;
+    assert!(result.is_ok());
+}
+```
+
+### Testing File System Operations
+
+```rust
+#[tokio::test]
+async fn test_settings_persistence() {
+    // Isolated test environment
+    let temp_dir = TempDir::new().expect("Failed to create temp directory");
+    let settings = AppSettings::default();
+
+    let save_result = save_settings_to_dir(&settings, &temp_dir.path().to_path_buf()).await;
+    let load_result = load_settings_from_dir(&temp_dir.path().to_path_buf()).await;
+
+    assert!(save_result.is_ok());
+    assert!(load_result.is_ok());
+    assert_eq!(load_result.unwrap().hot_key, settings.hot_key);
+}
+```
+
+## Test Coverage
+
+### Error Handling
+
+Test both success and failure cases:
+
+```rust
+#[test]
+fn test_function_handles_invalid_input() {
+    let result = function_under_test(invalid_input);
+    assert!(result.is_err());
+    assert_eq!(result.unwrap_err(), ExpectedError::InvalidInput);
+}
+```
+
+### Integration Tests
+
+- Unit tests: Individual functions with mocks
+- Integration tests: Component interactions with real implementations
+- Place in `tests/` directory
+
+```rust
+#[tokio::test]
+async fn test_complete_settings_workflow() {
+    let temp_dir = TempDir::new().unwrap();
+    let settings = AppSettings::default();
+
+    let save_result = save_settings_to_dir(&settings, &temp_dir.path().to_path_buf()).await;
+    let loaded_settings = load_settings_from_dir(&temp_dir.path().to_path_buf()).await;
+
+    assert!(save_result.is_ok());
+    assert_eq!(loaded_settings.unwrap().hot_key, settings.hot_key);
+}
+```
+
+## Anti-Patterns to Avoid
+
+### General TDD Anti-Patterns
+
+❌ **Implementation-first development** ❌ **Testing implementation details** (test behaviour, not
+internals) ❌ **Complex tests** (keep simple and focused) ❌ **Shared test state** (breaks
+isolation)
+
+### Tauri-Specific Anti-Patterns
+
+❌ **Testing Tauri command wrappers directly**
+
+```rust
+// DON'T - requires complex Tauri runtime setup
+#[test] fn test_tauri_command_wrapper() { /* hard to test */ }
+```
+
+❌ **Hard-coded AppHandle dependencies**
+
+```rust
+// DON'T - makes testing very difficult
+async fn function_with_hardcoded_apphandle(app: AppHandle) {
+    let service = GlobalHotkeyService::new(app);  // Hard to mock
+}
+```
+
+❌ **Mixing Tauri concerns with business logic**
+
+```rust
+// DON'T - put complex logic directly in Tauri commands
+#[tauri::command]
+async fn complex_command_with_business_logic(app: AppHandle) -> Result<Data, Error> {
+    // Extract to testable internal functions instead
+}
+```
+
+## Enforcement
+
+**MANDATORY for all code changes:**
+
+- Tests written BEFORE implementation
+- > 90% code coverage
+- Dependencies injected, not hard-coded
+- Error cases tested
+- Tests independent and isolated
+
+## Pre-Code Questions
+
+**Core TDD:**
+
+1. What behaviour do I want to test?
+2. How can I write a test for this behaviour?
+3. What dependencies does this function need?
+4. How can I make those dependencies mockable?
+5. What error conditions should I test?
+6. Is this function doing too much?
+
+**Tauri-Specific:**
+
+1. Can I separate this logic from AppHandle?
+2. Should this be an `*_internal` function?
+3. Am I testing business logic or framework behaviour?
+4. Can I use dependency injection vs hard-coding services?
+
+**Tests are specifications, not just verification.** Focus on business logic, not framework.

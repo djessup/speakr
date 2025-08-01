@@ -1,0 +1,177 @@
+---
+alwaysApply: true
+---
+# Non-Functional Requirements Integration Guide
+
+This guide establishes how Non-Functional Requirements (NFRs) are integrated into Speakr's
+development workflow using Kiro's spec system.
+
+## NFR Integration Strategy
+
+### Two-Tier Approach
+
+**Tier 1: Dedicated NFR Specs** - For measurable, testable requirements that need infrastructure
+**Tier 2: Steering Integration** - For design principles and constraints embedded in all development
+
+### When to Create NFR Specs
+
+Create dedicated specs when the NFR requires:
+
+- ✅ **Measurable validation** (performance metrics, size limits, crash rates)
+- ✅ **Testing infrastructure** (CI integration, monitoring systems, regression detection)
+- ✅ **Ongoing measurement** (telemetry, dashboards, alerting)
+- ✅ **Significant implementation effort** (multiple tasks, complex systems)
+
+### When to Use Steering Integration
+
+Use steering guidance when the NFR involves:
+
+- ✅ **Design principles** (privacy-first, offline-only, minimal dependencies)
+- ✅ **Development constraints** (coding standards, architecture patterns)
+- ✅ **Review criteria** (security checklist, accessibility guidelines)
+- ✅ **Simple validation** (manual checks, existing tools)
+
+## NFR Spec Integration Patterns
+
+### Referencing NFR Specs in Functional Requirements
+
+When implementing functional requirements, reference relevant NFR specs in task descriptions:
+
+```markdown
+- [ ] 2.3 Implement audio transcription pipeline
+  - Create Whisper model integration with streaming support
+  - Add error handling for model loading failures
+  - **NFR Integration**: Ensure P95 latency ≤ 3s (see nfr-latency spec)
+  - **NFR Integration**: Add crash recovery mechanisms (see nfr-reliability spec)
+  - _Requirements: 2.1, 2.3_
+```
+
+### Cross-Spec Task Dependencies
+
+Some functional tasks may depend on NFR infrastructure:
+
+```markdown
+- [ ] 3.1 Add performance monitoring to dictation pipeline
+  - Integrate with latency telemetry system from nfr-latency spec
+  - Add performance regression detection
+  - _Requirements: 3.2_
+  - _Dependencies: nfr-latency tasks 1-3_
+```
+
+### NFR Validation in Acceptance Criteria
+
+Include NFR validation in functional requirement acceptance criteria:
+
+```markdown
+#### Acceptance Criteria
+
+1. WHEN transcription completes THEN text SHALL be injected into target application
+2. WHEN transcription pipeline executes THEN P95 latency SHALL be ≤ 3s (NFR-latency)
+3. WHEN errors occur THEN system SHALL recover gracefully (NFR-reliability)
+```
+
+## Steering-Based NFR Guidelines
+
+### Privacy and Security (NFR-security)
+
+**Always apply these constraints:**
+
+- No network requests except for updates (with user consent)
+- All transcription processing must be local-only
+- No telemetry data leaves the device
+- User data must be encrypted at rest
+
+**Code Review Checklist:**
+
+- [ ] No external API calls in transcription pipeline
+- [ ] All file operations use secure temporary directories
+- [ ] No user data in logs or error messages
+- [ ] Proper cleanup of sensitive data in memory
+
+### Accessibility (NFR-accessibility)
+
+**Design Requirements:**
+
+- All UI components must support keyboard navigation
+- Color contrast ratios must meet WCAG 2.1 AA standards
+- Screen reader compatibility for all interactive elements
+- Configurable text sizes and high contrast modes
+
+**Implementation Guidelines:**
+
+- Use semantic HTML elements in Leptos components
+- Include ARIA labels for complex interactions
+- Test with macOS VoiceOver during development
+- Provide keyboard shortcuts for all mouse actions
+
+### Compatibility (NFR-compatibility)
+
+**Platform Constraints:**
+
+- Support macOS 13+ (Intel and Apple Silicon)
+- Use only stable Rust features (no nightly)
+- Minimize external dependencies
+- Test on both Intel and Apple Silicon hardware
+
+**Development Standards:**
+
+- Use feature flags for platform-specific code
+- Graceful degradation for older macOS versions
+- Comprehensive CI testing across target platforms
+
+## Implementation Workflow
+
+### For Features with NFR Dependencies
+
+1. **Review relevant NFR specs** during design phase
+2. **Include NFR tasks** in implementation plan
+3. **Reference NFR acceptance criteria** in functional requirements
+4. **Validate NFR compliance** during testing
+
+### For Features with Steering NFRs
+
+1. **Apply steering constraints** during design
+2. **Include NFR checklist items** in code review
+3. **Validate compliance** through manual review and existing tools
+
+## NFR Spec Maintenance
+
+### When NFR Specs Need Updates
+
+- Performance targets change based on user feedback
+- New testing infrastructure becomes available
+- Platform requirements evolve
+- Measurement methodologies improve
+
+### Keeping Steering Guidelines Current
+
+- Review steering NFRs during quarterly planning
+- Update guidelines based on lessons learned
+- Incorporate new platform requirements
+- Refine based on development team feedback
+
+## Examples and Templates
+
+### NFR Task Integration Template
+
+```markdown
+- [ ] X.Y Implement [feature component]
+  - [Core implementation details]
+  - **NFR Integration**: [Specific NFR requirement and reference]
+  - Add [monitoring/testing/validation] for [NFR compliance]
+  - _Requirements: [FR requirements]_
+  - _NFR Compliance: [NFR spec references]_
+```
+
+### NFR Acceptance Criteria Template
+
+```markdown
+#### Acceptance Criteria
+
+1. WHEN [functional condition] THEN [functional outcome] SHALL occur
+2. WHEN [functional condition] THEN [NFR constraint] SHALL be maintained
+3. WHEN [error condition] THEN [NFR recovery behavior] SHALL execute
+```
+
+This integration approach ensures NFRs are considered throughout development while maintaining focus
+on actionable, implementable tasks.
