@@ -25,21 +25,26 @@ tokio = { version = "1.40", features = [
   "time",
   "sync",
   "macros",
+  "fs",
+  "io-util",
 ] }
-whisper-rs = { version = "0.14.3", features = ["metal", "tracing_backend"] }
 anyhow = "1.0.98"
 serde = { version = "1.0.219", features = ["derive"] }
 size = { version = "0.5.0", features = ["serde"] }
+# Temporary files
 tempfile = "3.10.1"
 # TUI dependencies
 ratatui = "0.29.0"
-# crossterm = "0.29.0"
 # Enhanced logging
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 tracing-error = "0.2.0"
 color-eyre = "0.6.3"
 directories = "6.0.0"
 signal-hook = "0.3.18"
+# New dependencies for task 2.1
+reqwest = { version = "0.12", features = ["json", "stream", "rustls-tls"] }
+sha2 = "0.10"
+hex = "0.4"
 
 [dev-dependencies]
 # Async testing support
@@ -50,3 +55,5 @@ proptest = "1.4.0"
 mockall = "0.12.1"
 # Temporary directories for test isolation
 tempfile = "3.10.1"
+wiremock = "0.6.0"
+
