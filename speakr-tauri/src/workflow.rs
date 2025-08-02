@@ -82,7 +82,7 @@ pub async fn execute_dictation_workflow_with_loader(
     };
 
     // Step 2: Transcription (placeholder)
-    let transcribed_text = match transcribe_audio(audio_samples, &app_handle).await {
+    let transcribed_text = match transcribe_audio_with_status(audio_samples, &app_handle).await {
         Ok(text) => {
             info!("✅ Transcription completed: '{}'", text);
             text
@@ -252,6 +252,71 @@ async fn capture_audio_with_loader(
     Ok(samples)
 }
 
+/// Transcription Step – with status updates & progress (FR-3 task 6.2)
+/// --------------------------------------------------------------------------
+/// Emits status events and progress updates while delegating the heavy work to
+/// the speakr-core pipeline.
+#[allow(dead_code)]
+#[instrument(level = "debug", skip(audio_samples, app_handle))]
+async fn transcribe_audio_with_status(
+    audio_samples: Vec<i16>,
+    app_handle: &AppHandle,
+) -> Result<String, AppError> {
+    use crate::services::{update_global_service_status, ServiceComponent};
+    use speakr_core::pipeline;
+    use speakr_types::{ServiceStatus, TranscriptionConfig};
+    use tokio::time::{sleep, Duration};
+
+    debug!("Starting transcription of {} samples", audio_samples.len());
+
+    // Update backend status to "Starting" / processing
+    update_global_service_status(ServiceComponent::Transcription, ServiceStatus::Starting).await;
+
+    // Emit start event for UI
+    let _ = app_handle.emit("transcription-started", ());
+
+    // Spawn periodic pseudo-progress reporter
+    let progress_handle = {
+        let app_handle = app_handle.clone();
+        tokio::spawn(async move {
+            let mut progress: u8 = 0;
+            while progress < 95 {
+                sleep(Duration::from_millis(500)).await;
+                progress = progress.saturating_add(5);
+                let _ = app_handle.emit("transcription-progress", progress);
+            }
+        })
+    };
+
+    // Run core transcription pipeline (non-blocking)
+    let cfg = TranscriptionConfig::default();
+    let result = pipeline::transcription_pipeline(audio_samples, cfg).await;
+
+    // Stop progress task gracefully
+    progress_handle.abort();
+
+    match result {
+        Ok(res) => {
+            // Ensure UI reaches 100% and completion event
+            let _ = app_handle.emit("transcription-progress", 100u8);
+            let _ = app_handle.emit("transcription-completed", res.text.clone());
+            update_global_service_status(ServiceComponent::Transcription, ServiceStatus::Ready)
+                .await;
+            Ok(res.text)
+        }
+        Err(err) => {
+            error!("Transcription failed: {}", err);
+            update_global_service_status(
+                ServiceComponent::Transcription,
+                ServiceStatus::Error(err.to_string()),
+            )
+            .await;
+            let _ = app_handle.emit("transcription-error", err.to_string());
+            Err(AppError::Transcription(err.to_string()))
+        }
+    }
+}
+
 // ============================================================================
 // Transcription Step (Placeholder)
 // ============================================================================
@@ -275,6 +340,7 @@ async fn capture_audio_with_loader(
 ///
 /// This is a placeholder implementation that returns mock text.
 /// The actual implementation will use Whisper models via whisper-rs.
+#[allow(dead_code)]
 #[instrument(level = "debug", skip(audio_samples, app_handle))]
 async fn transcribe_audio(
     audio_samples: Vec<i16>,
@@ -343,7 +409,7 @@ async fn inject_text(text: String, app_handle: &AppHandle) -> Result<(), AppErro
 
     // TODO: Replace with actual text injection using enigo
     // This placeholder simulates injection processing time
-    let injection_time = Duration::from_millis(text.len() as u64 * 3); // ~3ms per character
+    let injection_time = Duration::from_millis((text.len() as u64) * 3); // ~3ms per character
     tokio::time::sleep(injection_time).await;
 
     // Simulate potential injection failures for testing

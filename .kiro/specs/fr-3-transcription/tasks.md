@@ -80,7 +80,7 @@
     - [x] Create retry logic for transient failures
     - _Requirements: 5.3, 5.4_
 
-- [ ] 6. Integrate with audio capture pipeline
+- [x] 6. Integrate with audio capture pipeline
 
   - [x] 6.1 Create pipeline integration for audio samples
 
@@ -89,7 +89,7 @@
     - Implement efficient sample transfer without copying
     - _Requirements: 6.1_
 
-  - [ ] 6.2 Add status updates and progress reporting
+  - [x] 6.2 Add status updates and progress reporting
     - Emit transcription status events for UI feedback
     - Implement progress callbacks during long transcriptions
     - Add pipeline error propagation with context

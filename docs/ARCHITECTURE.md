@@ -78,7 +78,7 @@ Key points:
 | -------- | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
 | Core     | `speakr-core/`          | Record audio (cpal) ➜ transcribe (whisper-rs) ➜ inject text (enigo)                                                                 |
 |          | `├── audio/`            | Audio capture and recording with configurable duration                                                                              |
-|          | `├── pipeline/`         | Glue layer – validates audio samples and forwards to transcription engine                                                            |
+|          | `├── pipeline/`         | Glue layer – validates audio samples and forwards to transcription engine                                                           |
 |          | `├── model/`            | Whisper model management and metadata handling                                                                                      |
 |          | `└── transcription/`    | Speech-to-text engine, language detection, and performance monitoring                                                               |
 | Types    | `speakr-types/`         | Shared type system: settings, errors, transcription types, and service status                                                       |
