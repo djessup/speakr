@@ -76,14 +76,34 @@ Key points:
 | Layer    | Crate / Path            | Main Responsibilities                                                             |
 | -------- | ----------------------- | --------------------------------------------------------------------------------- |
 | Core     | `speakr-core/`          | Record audio (cpal) ➜ transcribe (whisper-rs) ➜ inject text (enigo)               |
-|          | `├── audio/`            | Audio capture and recording with configurable duration                           |
+|          | `├── audio/`            | Audio capture and recording with configurable duration                            |
 |          | `├── model/`            | Whisper model management and metadata handling                                    |
-|          | `└── transcription/`    | Speech-to-text engine, language detection, and performance monitoring            |
+|          | `└── transcription/`    | Speech-to-text engine, language detection, and performance monitoring             |
+| Types    | `speakr-types/`         | Shared type system: settings, errors, transcription types, and service status    |
 | Backend  | `speakr-tauri/`         | Registers global hot-key, exposes `#[tauri::command]` wrappers, persists settings |
 | Frontend | `speakr-ui/` (optional) | Leptos WASM UI for tray, preferences, status overlay                              |
 | Assets   | `models/`               | GGUF Whisper models downloaded post-install                                       |
 
 All crates live in a single **Cargo workspace** to guarantee compatible dependency versions.
+
+### speakr-types: Unified Type System
+
+The `speakr-types` crate provides the shared type system used across all components:
+
+**Transcription Types:**
+
+- `PerformanceMode` - Processing optimisation (Speed, Balanced, Accuracy)
+- `TranscriptionConfig` - Configuration for model size, language, and performance preferences
+- `TranscriptionError` - Comprehensive error handling for model, processing, and language failures
+- `TranscriptionResult` - Complete transcription output with text, confidence, timing, and segments
+- `TranscriptionSegment` - Individual segments with precise timing and confidence metrics
+
+**Core Infrastructure:**
+
+- `AppSettings` - Application configuration with validation and migration support
+- `AppError` / `HotkeyError` - Unified error types for consistent error handling
+- `BackendStatus` / `ServiceStatus` - System health monitoring and status reporting
+- `ModelSize` / `ModelInfo` - Whisper model management and metadata
 
 ### 3.1 Speakr-Tauri Internal Structure
 
@@ -168,7 +188,13 @@ The workflow system integrates deeply with user settings:
 Each workflow step includes comprehensive error handling:
 
 - **Audio Capture Errors**: Device unavailable, permission denied, format issues
-- **Transcription Errors**: Model loading failures, processing errors (placeholder implementation)
+- **Transcription Errors**: Comprehensive error handling with `TranscriptionError` enum covering:
+  - Model not found or loading failures
+  - Insufficient memory for requested model size
+  - Processing failures during transcription
+  - Invalid audio format issues
+  - Unsupported language detection
+  - Model download failures
 - **Text Injection Errors**: Permission issues, target application problems (placeholder
   implementation)
 - **Settings Errors**: Invalid configuration, file system issues, validation failures

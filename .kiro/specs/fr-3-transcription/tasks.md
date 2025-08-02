@@ -10,7 +10,6 @@
     - ✅ Add comprehensive documentation and basic struct definitions
     - ✅ Add unit test verifying module structure imports
     - _Requirements: 6.1, 6.2_
-    - _Completed: 2025-01-14_
 
   - [ ] 1.2 Add whisper-rs dependency and basic types
     - Add `whisper-rs` crate to `speakr-core/Cargo.toml`

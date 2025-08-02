@@ -25,7 +25,8 @@ This workspace contains four main crates:
 - **[`speakr-tauri/`](speakr-tauri/)** - Tauri backend (global hotkeys, settings management, event
   handling)
 - **[`speakr-ui/`](speakr-ui/)** - Frontend UI (Leptos components and styling)
-- **[`speakr-types/`](speakr-types/)** - Shared types and data structures
+- **[`speakr-types/`](speakr-types/)** - Shared types and data structures (transcription types,
+  settings, errors)
 
 ## Quick Start
 

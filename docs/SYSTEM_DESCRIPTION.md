@@ -77,7 +77,49 @@ Use a Cargo workspace so all three crates share versions and CI.
 - **Testing Infrastructure**: Comprehensive test coverage with TDD practices
 - **Security Framework**: Input validation, DoS protection, and secure data handling
 
-### 4.2 Settings Integration & Security
+### 4.2 Transcription Type System
+
+The transcription system includes a comprehensive type system for configuration and error handling:
+
+```rust
+// Performance modes for different use cases
+pub enum PerformanceMode {
+    Speed,      // Optimised for fastest processing
+    Balanced,   // Default - balanced speed/accuracy
+    Accuracy,   // Prioritises highest accuracy
+}
+
+// Complete transcription configuration
+pub struct TranscriptionConfig {
+    pub model_size: ModelSize,           // Small, Medium, or Large
+    pub language: Option<String>,        // ISO 639-1 language code
+    pub auto_detect_language: bool,      // Automatic language detection
+    pub performance_mode: PerformanceMode, // Processing optimisation
+}
+
+// Comprehensive error handling
+pub enum TranscriptionError {
+    ModelNotFound { model_size: ModelSize },
+    ModelLoadingFailed(String),
+    ProcessingFailed(String),
+    InsufficientMemory { model_size: ModelSize },
+    InvalidAudioFormat(String),
+    UnsupportedLanguage { language: String },
+    DownloadFailed(String),
+}
+
+// Rich transcription results with timing data
+pub struct TranscriptionResult {
+    pub text: String,                    // Complete transcribed text
+    pub language: Option<String>,        // Detected/specified language
+    pub confidence: f32,                 // Overall confidence (0.0-1.0)
+    pub processing_time: Duration,       // Time taken for transcription
+    pub model_used: ModelSize,          // Model that processed the audio
+    pub segments: Vec<TranscriptionSegment>, // Detailed segment breakdown
+}
+```
+
+### 4.3 Settings Integration & Security
 
 The system includes robust settings integration with comprehensive security measures:
 
@@ -235,10 +277,13 @@ Comprehensive error handling with user feedback:
 ```rust
 pub enum AppError {
     AudioCapture(String),    // Device issues, permissions
-    Transcription(String),   // Model loading, processing
+    Transcription(String),   // Unified transcription errors (wraps TranscriptionError)
     TextInjection(String),   // Permission, target app issues
     Settings(String),        // Configuration problems
 }
+
+// Detailed transcription error types available via TranscriptionError enum
+// for specific error handling and user feedback
 ```
 
 > **Capability JSON** Add `global-shortcut:allow-register` to `src-tauri/capabilities/default.json`
