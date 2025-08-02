@@ -190,12 +190,17 @@ Each workflow step includes comprehensive error handling:
 
 - **Audio Capture Errors**: Device unavailable, permission denied, format issues
 - **Transcription Errors**: Comprehensive error handling with `TranscriptionError` enum covering:
-  - Model not found or loading failures
-  - Insufficient memory for requested model size
+  - Model not found or loading failures (automatic fallback to smaller model if memory limited)
+  - Insufficient memory for selected model size (returns `InsufficientMemory`, provides suggestions)
   - Processing failures during transcription
   - Invalid audio format issues
   - Unsupported language detection
   - Model download failures
+
+The `TranscriptionError` type now exposes helper methods:
+
+- `user_message()` – short, localised strings for UI toast/alert
+- `suggestions()` – actionable recovery tips displayed alongside errors
 - **Text Injection Errors**: Permission issues, target application problems (placeholder
   implementation)
 - **Settings Errors**: Invalid configuration, file system issues, validation failures
