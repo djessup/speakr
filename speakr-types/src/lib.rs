@@ -23,7 +23,7 @@
 // =========================
 // External Imports
 // =========================
-use serde::{ Deserialize, Serialize };
+use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use thiserror::Error;
 
@@ -379,14 +379,10 @@ impl AppSettings {
     /// ```
     pub fn validate(&self) -> Result<(), String> {
         if !Self::validate_audio_duration(self.audio_duration_secs) {
-            return Err(
-                format!(
-                    "Invalid audio duration: {} seconds. Must be between {} and {} seconds.",
-                    self.audio_duration_secs,
-                    MIN_AUDIO_DURATION_SECS,
-                    MAX_AUDIO_DURATION_SECS
-                )
-            );
+            return Err(format!(
+                "Invalid audio duration: {} seconds. Must be between {} and {} seconds.",
+                self.audio_duration_secs, MIN_AUDIO_DURATION_SECS, MAX_AUDIO_DURATION_SECS
+            ));
         }
 
         // Add other validation checks here as needed
@@ -582,30 +578,27 @@ impl ModelInfo {
     /// ```
     pub fn for_size(size: ModelSize) -> Self {
         match size {
-            ModelSize::Small =>
-                ModelInfo {
-                    size: ModelSize::Small,
-                    filename: "ggml-small.bin".to_string(),
-                    display_name: "Small (39MB, fast)".to_string(),
-                    file_size_mb: 39,
-                    description: "Fast processing, good for quick notes",
-                },
-            ModelSize::Medium =>
-                ModelInfo {
-                    size: ModelSize::Medium,
-                    filename: "ggml-medium.bin".to_string(),
-                    display_name: "Medium (769MB, balanced)".to_string(),
-                    file_size_mb: 769,
-                    description: "Balanced accuracy and speed",
-                },
-            ModelSize::Large =>
-                ModelInfo {
-                    size: ModelSize::Large,
-                    filename: "ggml-large.bin".to_string(),
-                    display_name: "Large (1550MB, accurate)".to_string(),
-                    file_size_mb: 1550,
-                    description: "Highest accuracy, best for professional use",
-                },
+            ModelSize::Small => ModelInfo {
+                size: ModelSize::Small,
+                filename: "ggml-small.bin".to_string(),
+                display_name: "Small (39MB, fast)".to_string(),
+                file_size_mb: 39,
+                description: "Fast processing, good for quick notes",
+            },
+            ModelSize::Medium => ModelInfo {
+                size: ModelSize::Medium,
+                filename: "ggml-medium.bin".to_string(),
+                display_name: "Medium (769MB, balanced)".to_string(),
+                file_size_mb: 769,
+                description: "Balanced accuracy and speed",
+            },
+            ModelSize::Large => ModelInfo {
+                size: ModelSize::Large,
+                filename: "ggml-large.bin".to_string(),
+                display_name: "Large (1550MB, accurate)".to_string(),
+                file_size_mb: 1550,
+                description: "Highest accuracy, best for professional use",
+            },
         }
     }
 }
@@ -722,9 +715,7 @@ impl Default for TranscriptionConfig {
 pub enum TranscriptionError {
     /// Requested model is not available locally.
     #[error("Model not found: {model_size:?}")]
-    ModelNotFound {
-        model_size: ModelSize,
-    },
+    ModelNotFound { model_size: ModelSize },
 
     /// Model loading failed during initialisation.
     #[error("Model loading failed: {0}")]
@@ -736,9 +727,7 @@ pub enum TranscriptionError {
 
     /// Insufficient memory available for the requested model.
     #[error("Insufficient memory for model: {model_size:?}")]
-    InsufficientMemory {
-        model_size: ModelSize,
-    },
+    InsufficientMemory { model_size: ModelSize },
 
     /// Invalid audio format provided for transcription.
     #[error("Invalid audio format: {0}")]
@@ -746,9 +735,7 @@ pub enum TranscriptionError {
 
     /// Language is not supported by the current model.
     #[error("Language not supported: {language}")]
-    UnsupportedLanguage {
-        language: String,
-    },
+    UnsupportedLanguage { language: String },
 
     /// Model download from remote source failed.
     #[error("Model download failed: {0}")]
@@ -759,17 +746,20 @@ impl TranscriptionError {
     /// Return a short, user-friendly error message suitable for UI display.
     pub fn user_message(&self) -> String {
         match self {
-            TranscriptionError::ModelNotFound { model_size } =>
-                format!("The requested {model_size:?} model is not available on this device."),
+            TranscriptionError::ModelNotFound { model_size } => {
+                format!("The requested {model_size:?} model is not available on this device.")
+            }
             TranscriptionError::ModelLoadingFailed(_) => {
                 "Unable to load the selected speech model.".to_string()
             }
             TranscriptionError::ProcessingFailed(_) => "Transcription failed.".to_string(),
-            TranscriptionError::InsufficientMemory { model_size } =>
-                format!("Not enough memory to run the {model_size:?} model."),
+            TranscriptionError::InsufficientMemory { model_size } => {
+                format!("Not enough memory to run the {model_size:?} model.")
+            }
             TranscriptionError::InvalidAudioFormat(_) => "Unsupported audio format.".to_string(),
-            TranscriptionError::UnsupportedLanguage { language } =>
-                format!("The language '{language}' is not supported by the current model."),
+            TranscriptionError::UnsupportedLanguage { language } => {
+                format!("The language '{language}' is not supported by the current model.")
+            }
             TranscriptionError::DownloadFailed(_) => "Model download failed.".to_string(),
         }
     }
@@ -777,32 +767,32 @@ impl TranscriptionError {
     /// Provide actionable suggestions that might resolve the error.
     pub fn suggestions(&self) -> Vec<&'static str> {
         match self {
-            TranscriptionError::ModelNotFound { .. } =>
-                vec![
-                    "Download the model in Settings → Models",
-                    "Ensure you are connected to the Internet"
-                ],
-            TranscriptionError::ModelLoadingFailed(_) =>
-                vec![
-                    "Restart Speakr to retry initialisation",
-                    "Try switching to a smaller model size"
-                ],
-            TranscriptionError::ProcessingFailed(_) =>
-                vec!["Retry the transcription operation", "Make sure the microphone is not muted"],
-            TranscriptionError::InsufficientMemory { .. } =>
-                vec![
-                    "Switch to a smaller model size in Settings",
-                    "Close other memory-intensive applications then retry"
-                ],
-            TranscriptionError::InvalidAudioFormat(_) =>
-                vec!["Provide 16-kHz 16-bit mono PCM audio samples"],
-            TranscriptionError::UnsupportedLanguage { .. } =>
-                vec![
-                    "Enable automatic language detection",
-                    "Switch to a multilingual model variant"
-                ],
-            TranscriptionError::DownloadFailed(_) =>
-                vec!["Check your network connection", "Retry the download later"],
+            TranscriptionError::ModelNotFound { .. } => vec![
+                "Download the model in Settings → Models",
+                "Ensure you are connected to the Internet",
+            ],
+            TranscriptionError::ModelLoadingFailed(_) => vec![
+                "Restart Speakr to retry initialisation",
+                "Try switching to a smaller model size",
+            ],
+            TranscriptionError::ProcessingFailed(_) => vec![
+                "Retry the transcription operation",
+                "Make sure the microphone is not muted",
+            ],
+            TranscriptionError::InsufficientMemory { .. } => vec![
+                "Switch to a smaller model size in Settings",
+                "Close other memory-intensive applications then retry",
+            ],
+            TranscriptionError::InvalidAudioFormat(_) => {
+                vec!["Provide 16-kHz 16-bit mono PCM audio samples"]
+            }
+            TranscriptionError::UnsupportedLanguage { .. } => vec![
+                "Enable automatic language detection",
+                "Switch to a multilingual model variant",
+            ],
+            TranscriptionError::DownloadFailed(_) => {
+                vec!["Check your network connection", "Retry the download later"]
+            }
         }
     }
 }
@@ -1048,9 +1038,9 @@ impl BackendStatus {
     /// assert!(ready_status.is_ready());
     /// ```
     pub fn is_ready(&self) -> bool {
-        self.audio_capture.is_ready() &&
-            self.transcription.is_ready() &&
-            self.text_injection.is_ready()
+        self.audio_capture.is_ready()
+            && self.transcription.is_ready()
+            && self.text_injection.is_ready()
     }
 
     /// Creates a new status with all services in starting state.
@@ -1134,15 +1124,25 @@ mod tests {
 
     #[test]
     fn test_audio_duration_validation_valid_range() {
-        assert!(AppSettings::validate_audio_duration(MIN_AUDIO_DURATION_SECS));
-        assert!(AppSettings::validate_audio_duration(DEFAULT_AUDIO_DURATION_SECS));
-        assert!(AppSettings::validate_audio_duration(MAX_AUDIO_DURATION_SECS));
+        assert!(AppSettings::validate_audio_duration(
+            MIN_AUDIO_DURATION_SECS
+        ));
+        assert!(AppSettings::validate_audio_duration(
+            DEFAULT_AUDIO_DURATION_SECS
+        ));
+        assert!(AppSettings::validate_audio_duration(
+            MAX_AUDIO_DURATION_SECS
+        ));
     }
 
     #[test]
     fn test_audio_duration_validation_invalid_range() {
-        assert!(!AppSettings::validate_audio_duration(MIN_AUDIO_DURATION_SECS - 1));
-        assert!(!AppSettings::validate_audio_duration(MAX_AUDIO_DURATION_SECS + 1));
+        assert!(!AppSettings::validate_audio_duration(
+            MIN_AUDIO_DURATION_SECS - 1
+        ));
+        assert!(!AppSettings::validate_audio_duration(
+            MAX_AUDIO_DURATION_SECS + 1
+        ));
         assert!(!AppSettings::validate_audio_duration(100));
     }
 
@@ -1150,16 +1150,26 @@ mod tests {
     fn test_audio_duration_constants_are_consistent() {
         assert!(MIN_AUDIO_DURATION_SECS <= DEFAULT_AUDIO_DURATION_SECS);
         assert!(DEFAULT_AUDIO_DURATION_SECS <= MAX_AUDIO_DURATION_SECS);
-        assert!(AppSettings::validate_audio_duration(DEFAULT_AUDIO_DURATION_SECS));
+        assert!(AppSettings::validate_audio_duration(
+            DEFAULT_AUDIO_DURATION_SECS
+        ));
     }
 
     #[test]
     fn test_audio_duration_validation_uses_constants() {
         // Test that validation uses the defined constants
-        assert!(AppSettings::validate_audio_duration(MIN_AUDIO_DURATION_SECS));
-        assert!(AppSettings::validate_audio_duration(MAX_AUDIO_DURATION_SECS));
-        assert!(!AppSettings::validate_audio_duration(MIN_AUDIO_DURATION_SECS - 1));
-        assert!(!AppSettings::validate_audio_duration(MAX_AUDIO_DURATION_SECS + 1));
+        assert!(AppSettings::validate_audio_duration(
+            MIN_AUDIO_DURATION_SECS
+        ));
+        assert!(AppSettings::validate_audio_duration(
+            MAX_AUDIO_DURATION_SECS
+        ));
+        assert!(!AppSettings::validate_audio_duration(
+            MIN_AUDIO_DURATION_SECS - 1
+        ));
+        assert!(!AppSettings::validate_audio_duration(
+            MAX_AUDIO_DURATION_SECS + 1
+        ));
     }
 
     #[test]
@@ -1189,9 +1199,8 @@ mod tests {
     fn test_settings_serialization() {
         let settings = AppSettings::default();
         let json = serde_json::to_string(&settings).expect("Settings should serialize to JSON");
-        let deserialized: AppSettings = serde_json
-            ::from_str(&json)
-            .expect("JSON should deserialize to settings");
+        let deserialized: AppSettings =
+            serde_json::from_str(&json).expect("JSON should deserialize to settings");
         assert_eq!(settings, deserialized);
     }
 
@@ -1247,7 +1256,10 @@ mod tests {
     fn test_service_status_display() {
         assert_eq!(ServiceStatus::Ready.display_name(), "Ready");
         assert_eq!(ServiceStatus::Starting.display_name(), "Starting");
-        assert_eq!(ServiceStatus::Error("test error".to_string()).display_name(), "Error");
+        assert_eq!(
+            ServiceStatus::Error("test error".to_string()).display_name(),
+            "Error"
+        );
         assert_eq!(ServiceStatus::Unavailable.display_name(), "Unavailable");
     }
 
@@ -1306,9 +1318,8 @@ mod tests {
         };
 
         let json = serde_json::to_string(&status).expect("Status should serialize to JSON");
-        let deserialized: BackendStatus = serde_json
-            ::from_str(&json)
-            .expect("JSON should deserialize to status");
+        let deserialized: BackendStatus =
+            serde_json::from_str(&json).expect("JSON should deserialize to status");
 
         assert_eq!(deserialized.timestamp, status.timestamp);
         assert_eq!(deserialized.audio_capture, status.audio_capture);
@@ -1354,9 +1365,8 @@ mod tests {
         };
 
         let json = serde_json::to_string(&config).expect("Config should serialize to JSON");
-        let deserialized: TranscriptionConfig = serde_json
-            ::from_str(&json)
-            .expect("JSON should deserialize to config");
+        let deserialized: TranscriptionConfig =
+            serde_json::from_str(&json).expect("JSON should deserialize to config");
         assert_eq!(config, deserialized);
     }
 
@@ -1369,7 +1379,10 @@ mod tests {
         assert!(error.to_string().contains("Large"));
 
         let error2 = TranscriptionError::ProcessingFailed("Audio too short".to_string());
-        assert_eq!(error2.to_string(), "Transcription processing failed: Audio too short");
+        assert_eq!(
+            error2.to_string(),
+            "Transcription processing failed: Audio too short"
+        );
     }
 
     #[test]
@@ -1435,9 +1448,8 @@ mod tests {
         // Test PerformanceMode serialization
         let mode = PerformanceMode::Speed;
         let json = serde_json::to_string(&mode).expect("PerformanceMode should serialize");
-        let deserialized: PerformanceMode = serde_json
-            ::from_str(&json)
-            .expect("JSON should deserialize to PerformanceMode");
+        let deserialized: PerformanceMode =
+            serde_json::from_str(&json).expect("JSON should deserialize to PerformanceMode");
         assert_eq!(mode, deserialized);
 
         // Test TranscriptionError serialization
@@ -1445,9 +1457,8 @@ mod tests {
             language: "xyz".to_string(),
         };
         let json = serde_json::to_string(&error).expect("TranscriptionError should serialize");
-        let deserialized: TranscriptionError = serde_json
-            ::from_str(&json)
-            .expect("JSON should deserialize to TranscriptionError");
+        let deserialized: TranscriptionError =
+            serde_json::from_str(&json).expect("JSON should deserialize to TranscriptionError");
         assert_eq!(error, deserialized);
     }
 }

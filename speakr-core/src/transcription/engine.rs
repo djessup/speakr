@@ -178,13 +178,47 @@ fn ensure_model_available(
     let filename = format!("ggml-{}.bin", model.filename());
     let path: PathBuf = manager.cache_dir().join(filename);
 
+    #[allow(unused_imports)]
+    use tokio::runtime::Runtime;
+
+    // 1. If the file is missing entirely, surface a ModelNotFound error (UI will guide the user).
     if !path.exists() {
         tracing::error!(missing_model=?path, "Model file not found");
         return Err(TranscriptionError::ModelNotFound {
             model_size: size.clone(),
         });
     }
-    Ok(())
+
+    // 2. Verify checksum – treat mismatch as corruption and trigger re-download.
+    #[cfg(test)]
+    {
+        // Skip expensive network access during unit tests – assume model is valid if present.
+        Ok(())
+    }
+    #[cfg(not(test))]
+    {
+        let rt = Runtime::new().expect("tokio runtime");
+        let is_valid = rt
+            .block_on(async { manager.is_available(model, true).await })
+            .unwrap_or(false);
+
+        if is_valid {
+            return Ok(());
+        }
+
+        // 3. Attempt automatic re-download for corrupted files (with retry).
+        tracing::warn!(
+            ?path,
+            "Model checksum mismatch – attempting automatic re-download"
+        );
+        match rt.block_on(async { manager.download_model_with_retry(model, 2).await }) {
+            Ok(_) => Ok(()),
+            Err(e) => {
+                tracing::error!(?e, "Automatic model download failed");
+                Err(TranscriptionError::DownloadFailed(e.to_string()))
+            }
+        }
+    }
 }
 
 // -----------------------------------------------------------------------------

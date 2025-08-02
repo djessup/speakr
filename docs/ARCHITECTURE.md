@@ -74,16 +74,17 @@ Key points:
 
 ## 3. Crate & Directory Layout
 
-| Layer    | Crate / Path            | Main Responsibilities                                                             |
-| -------- | ----------------------- | --------------------------------------------------------------------------------- |
-| Core     | `speakr-core/`          | Record audio (cpal) ➜ transcribe (whisper-rs) ➜ inject text (enigo)               |
-|          | `├── audio/`            | Audio capture and recording with configurable duration                            |
-|          | `├── model/`            | Whisper model management and metadata handling                                    |
-|          | `└── transcription/`    | Speech-to-text engine, language detection, and performance monitoring             |
-| Types    | `speakr-types/`         | Shared type system: settings, errors, transcription types, and service status     |
-| Backend  | `speakr-tauri/`         | Registers global hot-key, exposes `#[tauri::command]` wrappers, persists settings |
-| Frontend | `speakr-ui/` (optional) | Leptos WASM UI for tray, preferences, status overlay                              |
+| Layer    | Crate / Path            | Main Responsibilities                                                                                                               |
+| -------- | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| Core     | `speakr-core/`          | Record audio (cpal) ➜ transcribe (whisper-rs) ➜ inject text (enigo)                                                                 |
+|          | `├── audio/`            | Audio capture and recording with configurable duration                                                                              |
+|          | `├── model/`            | Whisper model management and metadata handling                                                                                      |
+|          | `└── transcription/`    | Speech-to-text engine, language detection, and performance monitoring                                                               |
+| Types    | `speakr-types/`         | Shared type system: settings, errors, transcription types, and service status                                                       |
+| Backend  | `speakr-tauri/`         | Registers global hot-key, exposes `#[tauri::command]` wrappers, persists settings                                                   |
+| Frontend | `speakr-ui/` (optional) | Leptos WASM UI for tray, preferences, status overlay                                                                                |
 | Assets   | `models/`               | GGUF Whisper models **cached** post-install (managed by `ModelManager`, stored under `~/Library/Application Support/Speakr/models`) |
+| Env      | `SPEAKR_MODEL_BASE_URL` | Override used by tests/CI to redirect model downloads to a local folder or mock server                                              |
 
 All crates live in a single **Cargo workspace** to guarantee compatible dependency versions.
 

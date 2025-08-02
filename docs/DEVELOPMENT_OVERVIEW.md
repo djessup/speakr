@@ -47,6 +47,9 @@ The `workflow_tests.rs` module validates the complete dictation pipeline integra
 All tests use isolated environments to prevent interference:
 
 - **Filesystem Tests**: Use `tempfile::TempDir` for isolated temporary directories
+- **Model Download Tests**: Use `SPEAKR_MODEL_BASE_URL=file://<absolute_path>` to redirect model
+  downloads to a folder of tiny stub `.bin` files. The `file://` scheme triggers a **local copy**
+  operation in the model manager – zero network traffic.
 - **Settings Tests**: Create isolated settings files that don't affect global configuration
 - **Audio Tests**: Mock audio devices and use test data where possible
 - **Test Utilities**: The `test_utils.rs` module provides helper functions for creating isolated

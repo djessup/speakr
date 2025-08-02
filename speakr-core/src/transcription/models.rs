@@ -108,7 +108,17 @@ impl ModelManager {
         }
 
         // 4. Download the file ---------------------------------------------------------------
-        let bytes = reqwest::get(url).await?.error_for_status()?.bytes().await?;
+        let bytes = if let Some(path_str) = url.strip_prefix("file://") {
+            // Local file copy for tests / offline scenarios
+            tokio::fs::read(path_str).await?
+        } else {
+            reqwest::get(url)
+                .await?
+                .error_for_status()?
+                .bytes()
+                .await?
+                .to_vec()
+        };
 
         // 5. Checksum validation -------------------------------------------------------------
         if let Some(expected) = expected_sha256 {
@@ -130,6 +140,38 @@ impl ModelManager {
         fs::rename(&tmp_path, &dest_path).await?;
 
         Ok(dest_path)
+    }
+
+    /// Download a model with retry logic for transient network failures.
+    ///
+    /// Attempts up to `retries` additional times with exponential back-off (1s, 2s, 4s …).
+    pub async fn download_model_with_retry(
+        &self,
+        model: &crate::model::Model,
+        retries: u8,
+    ) -> Result<PathBuf, ModelManagerError> {
+        use tokio::time::{sleep, Duration};
+
+        let url = model.url();
+        let sha = model.sha();
+
+        let mut attempt: u8 = 0;
+        loop {
+            match self.download_model(&url, Some(sha)).await {
+                Ok(path) => {
+                    return Ok(path);
+                }
+                Err(e) if attempt < retries => {
+                    tracing::warn!(?e, attempt, "Download failed – retrying");
+                    let backoff = Duration::from_secs(1 << attempt);
+                    sleep(backoff).await;
+                    attempt += 1;
+                }
+                Err(e) => {
+                    return Err(e);
+                }
+            }
+        }
     }
 
     // -------------------------------------------------------------------------

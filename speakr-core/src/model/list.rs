@@ -266,6 +266,13 @@ impl Model {
     }
 
     pub fn url(&self) -> String {
+        if let Ok(base) = std::env::var("SPEAKR_MODEL_BASE_URL") {
+            return format!(
+                "{}/ggml-{}.bin",
+                base.trim_end_matches('/'),
+                self.filename()
+            );
+        }
         format!(
             "https://huggingface.co/ggerganov/whisper.cpp/resolve/f281eb45af861ab5e5297d23694b7d46e090c02c/ggml-{}.bin",
             self.filename()

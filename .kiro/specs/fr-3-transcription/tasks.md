@@ -74,10 +74,10 @@
     - Implement error logging with appropriate detail levels
     - _Requirements: 5.1, 5.2, 5.3, 5.4_
 
-  - [ ] 5.2 Add error recovery mechanisms
-    - Implement automatic model re-download for corrupted files
+  - [x] 5.2 Add error recovery mechanisms
+    - [x] Implement automatic model re-download for corrupted files
     - [x] Add fallback to smaller models when memory is insufficient
-    - Create retry logic for transient failures
+    - [x] Create retry logic for transient failures
     - _Requirements: 5.3, 5.4_
 
 - [ ] 6. Integrate with audio capture pipeline
