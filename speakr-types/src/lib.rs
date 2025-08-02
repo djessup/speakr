@@ -755,6 +755,58 @@ pub enum TranscriptionError {
     DownloadFailed(String),
 }
 
+impl TranscriptionError {
+    /// Return a short, user-friendly error message suitable for UI display.
+    pub fn user_message(&self) -> String {
+        match self {
+            TranscriptionError::ModelNotFound { model_size } =>
+                format!("The requested {model_size:?} model is not available on this device."),
+            TranscriptionError::ModelLoadingFailed(_) => {
+                "Unable to load the selected speech model.".to_string()
+            }
+            TranscriptionError::ProcessingFailed(_) => "Transcription failed.".to_string(),
+            TranscriptionError::InsufficientMemory { model_size } =>
+                format!("Not enough memory to run the {model_size:?} model."),
+            TranscriptionError::InvalidAudioFormat(_) => "Unsupported audio format.".to_string(),
+            TranscriptionError::UnsupportedLanguage { language } =>
+                format!("The language '{language}' is not supported by the current model."),
+            TranscriptionError::DownloadFailed(_) => "Model download failed.".to_string(),
+        }
+    }
+
+    /// Provide actionable suggestions that might resolve the error.
+    pub fn suggestions(&self) -> Vec<&'static str> {
+        match self {
+            TranscriptionError::ModelNotFound { .. } =>
+                vec![
+                    "Download the model in Settings → Models",
+                    "Ensure you are connected to the Internet"
+                ],
+            TranscriptionError::ModelLoadingFailed(_) =>
+                vec![
+                    "Restart Speakr to retry initialisation",
+                    "Try switching to a smaller model size"
+                ],
+            TranscriptionError::ProcessingFailed(_) =>
+                vec!["Retry the transcription operation", "Make sure the microphone is not muted"],
+            TranscriptionError::InsufficientMemory { .. } =>
+                vec![
+                    "Switch to a smaller model size in Settings",
+                    "Close other memory-intensive applications then retry"
+                ],
+            TranscriptionError::InvalidAudioFormat(_) =>
+                vec!["Provide 16-kHz 16-bit mono PCM audio samples"],
+            TranscriptionError::UnsupportedLanguage { .. } =>
+                vec![
+                    "Enable automatic language detection",
+                    "Switch to a multilingual model variant"
+                ],
+            TranscriptionError::DownloadFailed(_) =>
+                vec!["Check your network connection", "Retry the download later"],
+        }
+    }
+}
+
 // --------------------------------------------------------------------------
 /// Individual transcription segment with timing information.
 ///

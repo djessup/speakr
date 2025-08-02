@@ -51,11 +51,46 @@ impl TranscriptionEngine {
         config: TranscriptionConfig,
         model_manager: ModelManager,
     ) -> Result<Self, TranscriptionError> {
-        let model = map_size_to_model(&config.model_size);
-        ensure_model_available(&model_manager, &model, &config.model_size)?;
+        use tracing::{error, warn};
+
+        let mut cfg = config;
+        let mut model = map_size_to_model(&cfg.model_size);
+
+        // 1. Ensure the model file is present – log but continue, we may fall back.
+        if let Err(e) = ensure_model_available(&model_manager, &model, &cfg.model_size) {
+            error!(?e, "Primary model not available – attempting fallback");
+        }
+
+        // 2. Check memory budget and downgrade model size if required.
+        let sys = System::new_all();
+        let total_mb = ((sys.total_memory() + sys.total_swap()) / 1024) as u32;
+        let budget_mb = ((total_mb as f32) * 0.75) as u32; // leave 25% headroom
+
+        if model.memory_usage_mb() > budget_mb {
+            warn!(
+                model_size = ?cfg.model_size,
+                required_mb = model.memory_usage_mb(),
+                budget_mb,
+                "Model exceeds memory budget – falling back to smaller size"
+            );
+
+            cfg.model_size = match cfg.model_size {
+                ModelSize::Large => ModelSize::Medium,
+                ModelSize::Medium => ModelSize::Small,
+                ModelSize::Small => {
+                    return Err(TranscriptionError::InsufficientMemory {
+                        model_size: cfg.model_size.clone(),
+                    });
+                }
+            };
+            model = map_size_to_model(&cfg.model_size);
+        }
+
+        // 3. Final availability check for the selected model.
+        ensure_model_available(&model_manager, &model, &cfg.model_size)?;
 
         Ok(Self {
-            config,
+            config: cfg,
             model_manager,
             active_model: model,
         })
@@ -144,6 +179,7 @@ fn ensure_model_available(
     let path: PathBuf = manager.cache_dir().join(filename);
 
     if !path.exists() {
+        tracing::error!(missing_model=?path, "Model file not found");
         return Err(TranscriptionError::ModelNotFound {
             model_size: size.clone(),
         });
