@@ -82,7 +82,7 @@
 
 - [ ] 6. Integrate with audio capture pipeline
 
-  - [ ] 6.1 Create pipeline integration for audio samples
+  - [x] 6.1 Create pipeline integration for audio samples
 
     - Accept `Vec<i16>` samples directly from AudioRecorder
     - Validate audio format compatibility (16 kHz mono)

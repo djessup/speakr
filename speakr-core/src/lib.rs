@@ -89,6 +89,12 @@ pub mod model;
 /// performance monitoring, and model management.
 pub mod transcription;
 
+/// Pipeline orchestration utilities – glue between audio capture and
+/// transcription processing.  Currently only exposes
+/// [`pipeline::transcription_pipeline`], which accepts raw `Vec<i16>` audio
+/// samples (16 kHz mono) and asynchronously returns a transcription result.
+pub mod pipeline;
+
 // ===========================================================================
 
 #[cfg(test)]
