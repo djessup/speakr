@@ -11,11 +11,13 @@
     - ✅ Add unit test verifying module structure imports
     - _Requirements: 6.1, 6.2_
 
-  - [ ] 1.2 Add whisper-rs dependency and basic types
-    - Add `whisper-rs` crate to `speakr-core/Cargo.toml`
-    - Define `TranscriptionError`, `TranscriptionResult`, and `TranscriptionConfig` in
+  - [x] 1.2 Add whisper-rs dependency and basic types
+    - ✅ Add `whisper-rs` crate to `speakr-core/Cargo.toml`
+    - ✅ Define `TranscriptionError`, `TranscriptionResult`, and `TranscriptionConfig` in
       `speakr-types`
-    - Create `ModelSize` and `PerformanceMode` enums
+    - ✅ Create `ModelSize` and `PerformanceMode` enums
+    - ✅ Add comprehensive unit tests for all transcription types
+    - ✅ Add documentation with examples for all public types
     - _Requirements: 1.1, 3.1_
 
 - [ ] 2. Implement model management system
