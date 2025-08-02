@@ -45,6 +45,8 @@ signal-hook = "0.3.18"
 reqwest = { version = "0.12", features = ["json", "stream", "rustls-tls"] }
 sha2 = "0.10"
 hex = "0.4"
+# System information for memory-based model recommendations (task 2.2)
+sysinfo = "0.36.1"
 
 [dev-dependencies]
 # Async testing support

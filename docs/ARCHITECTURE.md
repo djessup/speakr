@@ -9,6 +9,7 @@ status: Draft
 - [1. Purpose](#1-purpose)
 - [2. High-Level Architecture](#2-high-level-architecture)
 - [3. Crate \& Directory Layout](#3-crate--directory-layout)
+  - [speakr-types: Unified Type System](#speakr-types-unified-type-system)
   - [3.1 Speakr-Tauri Internal Structure](#31-speakr-tauri-internal-structure)
 - [4. Runtime Flow (Happy Path)](#4-runtime-flow-happy-path)
   - [Settings Integration](#settings-integration)

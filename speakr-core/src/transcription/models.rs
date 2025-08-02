@@ -159,6 +159,70 @@ impl ModelManager {
         let actual = hex::encode(Sha256::digest(&bytes));
         Ok(actual.eq_ignore_ascii_case(expected))
     }
+
+    // -------------------------------------------------------------------------
+    // Task 2.2 – Model metadata & availability helpers
+    // -------------------------------------------------------------------------
+
+    /// Return `true` if the given [`crate::model::Model`] is **present** in the
+    /// cache directory and the checksum matches the expected value embedded in
+    /// the enum definition.
+    ///
+    /// This performs a *cheap* filesystem existence check – **no network
+    /// traffic** and no expensive hashing unless `verify_hash` is `true`.
+    pub async fn is_available(
+        &self,
+        model: &crate::model::Model,
+        verify_hash: bool,
+    ) -> Result<bool, std::io::Error> {
+        let filename = format!("ggml-{}.bin", model.filename());
+        let path = self.cache_dir.join(filename);
+
+        if !path.exists() {
+            return Ok(false);
+        }
+
+        if verify_hash {
+            let expected = model.sha();
+            return Self::verify_checksum(&path, expected).await;
+        }
+
+        Ok(true)
+    }
+
+    /// Return a list of *all* models that are currently cached on disk.
+    pub async fn available_models(&self) -> Vec<crate::model::Model> {
+        use crate::model::Model;
+        let mut list = Vec::new();
+
+        for model in Model::iter() {
+            // When checksum verification fails we simply treat the model as
+            // unavailable – upper layers may decide to re-download it.
+            if let Ok(true) = self.is_available(&model, false).await {
+                list.push(model);
+            }
+        }
+
+        list
+    }
+
+    /// Recommend the most suitable model(s) based on available *system* memory.
+    ///
+    /// The heuristic is intentionally conservative: we require that a model's
+    /// *peak* RAM usage must not exceed **75 %** of the total memory (RAM +
+    /// swap) to leave headroom for the UI and other processes.
+    pub fn recommend_for_current_system(&self) -> Vec<crate::model::Model> {
+        use crate::model::Model;
+        use sysinfo::System;
+
+        let sys = System::new_all();
+        let total_mb = ((sys.total_memory() + sys.total_swap()) / 1024) as u32; // convert KiB → MiB
+        let budget = ((total_mb as f32) * 0.75) as u32;
+
+        Model::iter()
+            .filter(|m| m.memory_usage_mb() <= budget)
+            .collect()
+    }
 }
 
 impl Default for ModelManager {

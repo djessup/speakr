@@ -52,7 +52,7 @@
 //! <https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium.en-q5_0.bin>
 use size::Size;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Model {
     Tiny,
     TinyQuantizedQ5_1,
@@ -166,6 +166,67 @@ impl Model {
         }
     }
 
+    /// Approximate peak RAM usage (in megabytes) required to load the model into memory.
+    ///
+    /// These numbers are based on official whisper.cpp benchmarks and empirical measurements.
+    /// Memory usage includes model weights, activations, and inference buffers. Quantized
+    /// models typically use 30-50% less memory than their full-precision counterparts.
+    ///
+    /// **Note**: These are peak memory estimates during inference. Actual usage may vary
+    /// depending on hardware, batch size, and audio length. For production use, ensure
+    /// at least 50% additional headroom for system processes and UI.
+    pub fn memory_usage_mb(&self) -> u32 {
+        match self {
+            // Tiny models: ~273 MB (official whisper.cpp measurement)
+            // Quantized versions use ~40-50% less memory
+            Model::Tiny | Model::TinyEn => 273,
+            Model::TinyQuantizedQ5_1 | Model::TinyEnQuantizedQ5_1 => 164, // ~40% reduction
+            Model::TinyQuantizedQ8_0 | Model::TinyEnQuantizedQ8_0 => 191, // ~30% reduction
+
+            // Base models: ~388 MB (official whisper.cpp measurement)
+            // Quantized versions use ~40-50% less memory
+            Model::Base | Model::BaseEn => 388,
+            Model::BaseQuantizedQ5_1 | Model::BaseEnQuantizedQ5_1 => 233, // ~40% reduction
+            Model::BaseQuantizedQ8_0 | Model::BaseEnQuantizedQ8_0 => 272, // ~30% reduction
+
+            // Small models: ~852 MB (official whisper.cpp measurement)
+            // Quantized versions use ~40-50% less memory
+            Model::Small | Model::SmallEn => 852,
+            Model::SmallQuantizedQ5_1 | Model::SmallEnQuantizedQ5_1 => 511, // ~40% reduction
+            Model::SmallQuantizedQ8_0 | Model::SmallEnQuantizedQ8_0 => 596, // ~30% reduction
+
+            // Medium models: ~2.1 GB (official whisper.cpp measurement)
+            // Quantized versions use ~40-50% less memory
+            Model::Medium | Model::MediumEn => 2150,
+            Model::MediumQuantizedQ5_0 | Model::MediumEnQuantizedQ5_0 => 1290, // ~40% reduction
+            Model::MediumQuantizedQ8_0 | Model::MediumEnQuantizedQ8_0 => 1505, // ~30% reduction
+
+            // Large V3 Turbo: ~1.5 GB (based on model size and architecture)
+            // Quantized versions use ~40-50% less memory
+            Model::LargeV3Turbo => 1500,
+            Model::LargeV3TurboQuantizedQ5_0 => 900, // ~40% reduction
+            Model::LargeV3TurboQuantizedQ8_0 => 1050, // ~30% reduction
+
+            // Large models: ~3.9 GB (official whisper.cpp measurement)
+            // Quantized versions use ~40-50% less memory
+            Model::LargeV1 | Model::LargeV2 | Model::LargeV3 => 3900,
+            Model::LargeV2QuantizedQ5_0 | Model::LargeV3QuantizedQ5_0 => 2340, // ~40% reduction
+            Model::LargeV2QuantizedQ8_0 => 2730,                               // ~30% reduction
+        }
+    }
+
+    /// Returns a list of ISO-639-1 language codes that the model is *restricted* to.
+    ///
+    /// Models with the `.en` suffix are English-only.  All other models support the
+    /// full multilingual vocabulary, hence `None` is returned.
+    pub fn supported_languages(&self) -> Option<&'static [&'static str]> {
+        if self.filename().ends_with(".en") {
+            Some(&["en"]) // English-only models
+        } else {
+            None // Multilingual
+        }
+    }
+
     pub fn sha(&self) -> &'static str {
         match self {
             Model::Tiny => "bd577a113a864445d4c299885e0cb97d4ba92b5f",
@@ -209,5 +270,46 @@ impl Model {
             "https://huggingface.co/ggerganov/whisper.cpp/resolve/f281eb45af861ab5e5297d23694b7d46e090c02c/ggml-{}.bin",
             self.filename()
         )
+    }
+
+    /// Returns an iterator over **all** supported models.
+    pub fn iter() -> impl Iterator<Item = Self> {
+        use Model::*;
+        [
+            Tiny,
+            TinyQuantizedQ5_1,
+            TinyQuantizedQ8_0,
+            TinyEn,
+            TinyEnQuantizedQ5_1,
+            TinyEnQuantizedQ8_0,
+            Base,
+            BaseQuantizedQ5_1,
+            BaseQuantizedQ8_0,
+            BaseEn,
+            BaseEnQuantizedQ5_1,
+            BaseEnQuantizedQ8_0,
+            Small,
+            SmallQuantizedQ5_1,
+            SmallQuantizedQ8_0,
+            SmallEn,
+            SmallEnQuantizedQ5_1,
+            SmallEnQuantizedQ8_0,
+            Medium,
+            MediumQuantizedQ5_0,
+            MediumQuantizedQ8_0,
+            MediumEn,
+            MediumEnQuantizedQ5_0,
+            MediumEnQuantizedQ8_0,
+            LargeV1,
+            LargeV2,
+            LargeV2QuantizedQ5_0,
+            LargeV2QuantizedQ8_0,
+            LargeV3,
+            LargeV3QuantizedQ5_0,
+            LargeV3Turbo,
+            LargeV3TurboQuantizedQ5_0,
+            LargeV3TurboQuantizedQ8_0,
+        ]
+        .into_iter()
     }
 }
