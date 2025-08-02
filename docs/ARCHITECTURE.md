@@ -82,7 +82,7 @@ Key points:
 | Types    | `speakr-types/`         | Shared type system: settings, errors, transcription types, and service status     |
 | Backend  | `speakr-tauri/`         | Registers global hot-key, exposes `#[tauri::command]` wrappers, persists settings |
 | Frontend | `speakr-ui/` (optional) | Leptos WASM UI for tray, preferences, status overlay                              |
-| Assets   | `models/`               | GGUF Whisper models downloaded post-install                                       |
+| Assets   | `models/`               | GGUF Whisper models **cached** post-install (managed by `ModelManager`, stored under `~/Library/Application Support/Speakr/models`) |
 
 All crates live in a single **Cargo workspace** to guarantee compatible dependency versions.
 

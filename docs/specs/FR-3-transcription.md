@@ -60,7 +60,7 @@ pub struct TranscriptionResult {
 The transcription functionality is organised into focused submodules:
 
 - `speakr-core/src/transcription/engine.rs` - Core transcription engine
-- `speakr-core/src/transcription/models.rs` - Model management and loading
+- `speakr-core/src/transcription/models.rs` - `ModelManager` download/cache & model loading
 - `speakr-core/src/transcription/language.rs` - Language detection and handling
 - `speakr-core/src/transcription/performance.rs` - Performance monitoring and metrics
 
