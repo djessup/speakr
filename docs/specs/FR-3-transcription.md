@@ -6,8 +6,8 @@ Offline transcription of recorded audio to text using Whisper.
 
 1. Use `whisper-rs` to run Whisper (GGUF) models entirely on-device.
 2. Default language: English (en). Allow user language selection in Settings.
-3. Transcription must complete within **≤ 3 s** (95th percentile) for 5-second recordings on
-   Apple Silicon with the small model.
+3. Transcription must complete within **≤ 3 s** (95th percentile) for 5-second recordings on Apple
+   Silicon with the small model.
 4. Support user-selectable model sizes for latency/accuracy trade-off.
 5. No external network calls during transcription.
 
@@ -78,8 +78,8 @@ privacy-first promise.
 
 ## Test-Driven Design
 
-Begin with failing automated tests for latency, language selection, and network isolation.
-Implement transcription until all tests pass, following TDD.
+Begin with failing automated tests for latency, language selection, and network isolation. Implement
+transcription until all tests pass, following TDD.
 
 ## References
 

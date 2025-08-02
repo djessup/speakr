@@ -79,7 +79,7 @@ Key points:
 |          | `├── audio/`            | Audio capture and recording with configurable duration                            |
 |          | `├── model/`            | Whisper model management and metadata handling                                    |
 |          | `└── transcription/`    | Speech-to-text engine, language detection, and performance monitoring             |
-| Types    | `speakr-types/`         | Shared type system: settings, errors, transcription types, and service status    |
+| Types    | `speakr-types/`         | Shared type system: settings, errors, transcription types, and service status     |
 | Backend  | `speakr-tauri/`         | Registers global hot-key, exposes `#[tauri::command]` wrappers, persists settings |
 | Frontend | `speakr-ui/` (optional) | Leptos WASM UI for tray, preferences, status overlay                              |
 | Assets   | `models/`               | GGUF Whisper models downloaded post-install                                       |

@@ -72,7 +72,7 @@ impl ModelManager {
     /// Ensure that [`ModelManager::cache_dir`] exists on disk.
     async fn ensure_cache_dir(&self) -> Result<(), std::io::Error> {
         if !self.cache_dir.exists() {
-            fs::create_dir_all(&self.cache_dir).await?
+            fs::create_dir_all(&self.cache_dir).await?;
         }
         Ok(())
     }
