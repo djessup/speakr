@@ -13,6 +13,7 @@ name = "update-models-tui"
 path = "src/bin/update_models_tui.rs"
 
 [dependencies]
+speakr-types = { path = "../speakr-types" }
 # Audio capture for 16kHz mono streams
 cpal = "0.15.3"
 # Error handling with custom types

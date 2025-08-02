@@ -37,14 +37,14 @@
 
 - [ ] 3. Implement core transcription engine
 
-  - [ ] 3.1 Create TranscriptionEngine with whisper-rs integration
+  - [x] 3.1 Create TranscriptionEngine with whisper-rs integration
 
     - Initialize WhisperContext with model loading
     - Implement basic transcribe() method for `Vec<i16>` input
     - Add proper error handling for model loading failures
     - _Requirements: 1.1, 2.2, 5.1_
 
-  - [ ] 3.2 Add model switching and language configuration
+  - [x] 3.2 Add model switching and language configuration
     - Implement runtime model switching without restart
     - Add language selection and auto-detection support
     - Create configuration update methods for settings integration
