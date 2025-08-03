@@ -28,6 +28,26 @@ This workspace contains four main crates:
 - **[`speakr-types/`](speakr-types/)** - Shared types and data structures (transcription types,
   settings, errors)
 
+## Model Management CLI
+
+Speakr comes with a developer-facing **model management** utility:
+
+```bash
+# List cached models
+cargo run -p speakr-core --bin models-cli -- list --cached
+
+# Download a model (with progress bar)
+cargo run -p speakr-core --bin models-cli -- download tiny.en
+
+# Verify checksums of all cached models
+cargo run -p speakr-core --bin models-cli -- verify all
+```
+
+Set `SPEAKR_MODEL_BASE_URL` to point downloads to a mirror (defaults to the official HuggingFace
+repo).
+
+---
+
 ## Quick Start
 
 ### Prerequisites

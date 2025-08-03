@@ -12,7 +12,12 @@ path = "src/bin/update_models.rs"
 name = "update-models-tui"
 path = "src/bin/update_models_tui.rs"
 
+[[bin]]
+name = "models-cli"
+path = "src/bin/models_cli.rs"
+
 [dependencies]
+clap = { version = "4.5.4", features = ["derive"] }
 speakr-types = { path = "../speakr-types" }
 # Audio capture for 16kHz mono streams
 cpal = "0.15.3"
@@ -43,9 +48,12 @@ color-eyre = "0.6.3"
 directories = "6.0.0"
 signal-hook = "0.3.18"
 # New dependencies for task 2.1
+sha1 = "0.10"
 reqwest = { version = "0.12", features = ["json", "stream", "rustls-tls"] }
 sha2 = "0.10"
 hex = "0.4"
+indicatif = { version = "0.17", features = ["tokio"] }
+futures-util = "0.3"
 # System information for memory-based model recommendations (task 2.2)
 sysinfo = "0.36.1"
 

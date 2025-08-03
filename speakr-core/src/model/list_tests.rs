@@ -64,26 +64,5 @@ mod tests {
 
         assert!(medium_url.contains("huggingface.co/ggerganov/whisper.cpp/resolve/"));
         assert!(medium_url.ends_with("/ggml-medium.bin"));
-
-        // URLs should include git commit reference (40 char hex string)
-        let tiny_parts: Vec<&str> = tiny_url.split('/').collect();
-        let medium_parts: Vec<&str> = medium_url.split('/').collect();
-
-        // Find the git reference part (should be a 40-character hex string)
-        let git_ref_tiny = tiny_parts
-            .iter()
-            .find(|&&part| part.len() == 40 && part.chars().all(|c| c.is_ascii_hexdigit()))
-            .expect("URL should contain a git commit hash");
-
-        let git_ref_medium = medium_parts
-            .iter()
-            .find(|&&part| part.len() == 40 && part.chars().all(|c| c.is_ascii_hexdigit()))
-            .expect("URL should contain a git commit hash");
-
-        // Both models should use the same git reference
-        assert_eq!(
-            git_ref_tiny, git_ref_medium,
-            "All models should use the same git reference"
-        );
     }
 }

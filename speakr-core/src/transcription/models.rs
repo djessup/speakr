@@ -20,6 +20,7 @@
 use std::path::{Path, PathBuf};
 
 use directories::ProjectDirs;
+use sha1::Sha1;
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 use tokio::fs;
@@ -84,7 +85,7 @@ impl ModelManager {
     pub async fn download_model(
         &self,
         url: &str,
-        expected_sha256: Option<&str>,
+        expected_checksum: Option<&str>,
     ) -> Result<PathBuf, ModelManagerError> {
         // 1. Prepare cache directory ----------------------------------------------------------
         self.ensure_cache_dir().await?;
@@ -98,7 +99,7 @@ impl ModelManager {
 
         // 3. If the file already exists and (optionally) matches the checksum, short-circuit.
         if dest_path.exists() {
-            if let Some(expected) = expected_sha256 {
+            if let Some(expected) = expected_checksum {
                 if Self::verify_checksum(&dest_path, expected).await? {
                     return Ok(dest_path);
                 }
@@ -121,8 +122,16 @@ impl ModelManager {
         };
 
         // 5. Checksum validation -------------------------------------------------------------
-        if let Some(expected) = expected_sha256 {
-            let actual = hex::encode(Sha256::digest(&bytes));
+        if let Some(expected) = expected_checksum {
+            let actual = match expected.len() {
+                40 => {
+                    let mut hasher = Sha1::new();
+                    hasher.update(&bytes);
+                    hex::encode(hasher.finalize())
+                }
+                64 => hex::encode(Sha256::digest(&bytes)),
+                _ => "".to_string(),
+            };
             if !actual.eq_ignore_ascii_case(expected) {
                 return Err(ModelManagerError::ChecksumMismatch {
                     expected: expected.to_string(),
@@ -185,7 +194,7 @@ impl ModelManager {
             return PathBuf::from(dir);
         }
 
-        if let Some(dirs) = ProjectDirs::from("com", "Speakr", "Speakr") {
+        if let Some(dirs) = ProjectDirs::from("com", "speakr", env!("CARGO_PKG_NAME")) {
             return dirs.data_local_dir().join("models");
         }
 
@@ -195,10 +204,46 @@ impl ModelManager {
             .join("models")
     }
 
-    /// Verify that the SHA-256 checksum of `path` matches `expected`.
+    /// Verify that the checksum of `path` matches `expected`.
+    ///
+    /// Supports HEX-encoded SHA-1 (40 chars) **or** SHA-256 (64 chars) hashes
+    /// based on the length of the `expected` string.
+    ///
+    /// The file is streamed through a 1 MiB buffer to avoid loading multi-GB
+    /// models into RAM.
     async fn verify_checksum(path: &Path, expected: &str) -> Result<bool, std::io::Error> {
-        let bytes = fs::read(path).await?;
-        let actual = hex::encode(Sha256::digest(&bytes));
+        use tokio::io::{AsyncReadExt, BufReader};
+
+        // Decide algorithm from expected length
+        enum Algo {
+            Sha1(Sha1),
+            Sha256(Sha256),
+        }
+        let mut algo = match expected.len() {
+            40 => Algo::Sha1(Sha1::new()),
+            64 => Algo::Sha256(Sha256::new()),
+            _ => {
+                return Ok(false);
+            }
+        };
+
+        let file = fs::File::open(path).await?;
+        let mut reader = BufReader::with_capacity(1024 * 1024, file);
+        let mut buffer = vec![0u8; 1024 * 1024];
+        loop {
+            let n = reader.read(&mut buffer).await?;
+            if n == 0 {
+                break;
+            }
+            match &mut algo {
+                Algo::Sha1(h) => h.update(&buffer[..n]),
+                Algo::Sha256(h) => h.update(&buffer[..n]),
+            }
+        }
+        let actual = match algo {
+            Algo::Sha1(h) => hex::encode(h.finalize()),
+            Algo::Sha256(h) => hex::encode(h.finalize()),
+        };
         Ok(actual.eq_ignore_ascii_case(expected))
     }
 
