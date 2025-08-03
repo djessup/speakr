@@ -160,6 +160,8 @@ async fn test_settings_serialization() {
         hot_key: "CmdOrCtrl+Alt+D".to_string(),
         model_size: "large".to_string(),
         auto_launch: true,
+        language: None,
+        performance_mode: speakr_types::PerformanceMode::Balanced,
         audio_duration_secs: 10,
     };
 
@@ -186,6 +188,8 @@ async fn debug_save_button_functionality() {
         hot_key: "CmdOrCtrl+Alt+T".to_string(),
         model_size: "medium".to_string(),
         auto_launch: true,
+        language: None,
+        performance_mode: speakr_types::PerformanceMode::Balanced,
         audio_duration_secs: 10,
     };
 
@@ -233,6 +237,8 @@ async fn test_save_and_load_settings() {
         hot_key: "CmdOrCtrl+Alt+S".to_string(),
         model_size: "large".to_string(),
         auto_launch: true,
+        language: None,
+        performance_mode: speakr_types::PerformanceMode::Balanced,
         audio_duration_secs: 10,
     };
 
@@ -408,6 +414,8 @@ async fn test_isolated_settings_save_and_load() {
         hot_key: "CmdOrCtrl+Alt+T".to_string(),
         model_size: "large".to_string(),
         auto_launch: true,
+        language: None,
+        performance_mode: speakr_types::PerformanceMode::Balanced,
         audio_duration_secs: 10,
     };
 
@@ -537,6 +545,8 @@ async fn test_save_and_load_settings_roundtrip_with_custom_hotkey() {
         hot_key: custom_hotkey.to_string(),
         model_size: "large".to_string(),
         auto_launch: true,
+        language: None,
+        performance_mode: speakr_types::PerformanceMode::Balanced,
         audio_duration_secs: 10,
     };
 
@@ -582,6 +592,8 @@ async fn test_load_settings_preserves_various_hotkey_formats() {
             hot_key: hotkey.to_string(),
             model_size: "medium".to_string(),
             auto_launch: false,
+            language: None,
+            performance_mode: speakr_types::PerformanceMode::Balanced,
             audio_duration_secs: 10,
         };
 
@@ -613,6 +625,8 @@ async fn test_load_settings_handles_empty_hotkey() {
         hot_key: "".to_string(), // Empty hotkey
         model_size: "medium".to_string(),
         auto_launch: false,
+        language: None,
+        performance_mode: speakr_types::PerformanceMode::Balanced,
         audio_duration_secs: 10,
     };
 
@@ -641,6 +655,8 @@ async fn test_load_settings_handles_special_characters_in_hotkey() {
         hot_key: special_hotkey.to_string(),
         model_size: "medium".to_string(),
         auto_launch: false,
+        language: None,
+        performance_mode: speakr_types::PerformanceMode::Balanced,
         audio_duration_secs: 10,
     };
 
@@ -674,6 +690,8 @@ async fn test_settings_roundtrip_preserves_custom_hotkey() {
         hot_key: custom_hotkey.to_string(),
         model_size: "medium".to_string(),
         auto_launch: false,
+        language: None,
+        performance_mode: speakr_types::PerformanceMode::Balanced,
         audio_duration_secs: 10,
     };
 

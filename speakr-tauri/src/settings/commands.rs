@@ -60,3 +60,52 @@ pub async fn load_settings_internal() -> Result<AppSettings, AppError> {
 
     load_settings_from_dir(&settings_dir).await
 }
+
+// --------------------------------------------------------------------------
+/// Updates the selected Whisper model size in settings and persists it.
+///
+/// # Arguments
+/// * `model_size` - The new model size identifier ("small", "medium", "large")
+///
+/// # Errors
+/// Returns `AppError::Settings` if validation fails or settings cannot be saved.
+pub async fn update_model_size_internal(model_size: String) -> Result<(), AppError> {
+    // Validate supported sizes
+    match model_size.as_str() {
+        "small" | "medium" | "large" => {}
+        _ => {
+            return Err(AppError::Settings(format!(
+                "Unknown model size: {model_size}"
+            )));
+        }
+    }
+
+    let mut settings = load_settings_internal().await?;
+    settings.model_size = model_size;
+    save_settings_internal(settings).await
+}
+
+// --------------------------------------------------------------------------
+/// Updates the preferred transcription language in settings and persists it.
+///
+/// # Arguments
+/// * `language` - ISO 639-1 language code. Empty string disables explicit language.
+///
+/// # Errors
+/// Returns `AppError::Settings` if validation fails or settings cannot be saved.
+pub async fn update_language_internal(language: String) -> Result<(), AppError> {
+    // Basic validation: allow empty string or 2-letter code
+    if !language.is_empty() && language.len() != 2 {
+        return Err(AppError::Settings(
+            "Language code must be empty or 2-letter ISO 639-1 code".to_string(),
+        ));
+    }
+
+    let mut settings = load_settings_internal().await?;
+    settings.language = if language.is_empty() {
+        None
+    } else {
+        Some(language)
+    };
+    save_settings_internal(settings).await
+}

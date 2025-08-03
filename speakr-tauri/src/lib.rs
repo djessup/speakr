@@ -128,6 +128,20 @@ async fn check_model_availability(model_size: String) -> Result<bool, AppError> 
 }
 
 // --------------------------------------------------------------------------
+/// Updates the selected Whisper model size in settings.
+#[tauri::command]
+async fn update_model_size(model_size: String) -> Result<(), AppError> {
+    settings::update_model_size_internal(model_size).await
+}
+
+// --------------------------------------------------------------------------
+/// Updates the preferred transcription language in settings.
+#[tauri::command]
+async fn update_language(language: String) -> Result<(), AppError> {
+    settings::update_language_internal(language).await
+}
+
+// --------------------------------------------------------------------------
 /// Registers a global hot-key with the system (simple interface).
 ///
 /// # Arguments
@@ -444,6 +458,8 @@ pub fn run() {
                     register_global_hotkey,
                     unregister_global_hotkey,
                     update_global_hotkey,
+                    update_model_size,
+                    update_language,
                     debug_test_audio_recording,
                     debug_start_recording,
                     debug_stop_recording,
@@ -465,6 +481,8 @@ pub fn run() {
                     register_global_hotkey,
                     unregister_global_hotkey,
                     update_global_hotkey,
+                    update_model_size,
+                    update_language,
                     get_backend_status,
                     update_service_status
                 ]

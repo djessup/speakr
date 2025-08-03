@@ -312,6 +312,8 @@ fn test_app_settings_structure_supports_hotkey_configuration() {
         hot_key: "CmdOrCtrl+Alt+TestKey".to_string(),
         model_size: "medium".to_string(),
         auto_launch: false,
+        language: None,
+        performance_mode: speakr_types::PerformanceMode::Balanced,
         audio_duration_secs: 10,
     };
 

@@ -95,16 +95,16 @@
     - Add pipeline error propagation with context
     - _Requirements: 6.4_
 
-- [ ] 7. Add settings integration
+- [x] 7. Add settings integration
 
-  - [ ] 7.1 Extend AppSettings with transcription configuration
+  - [x] 7.1 Extend AppSettings with transcription configuration
 
     - Add transcription fields to AppSettings in speakr-types
     - Include model_size, language, and performance_mode settings
     - Ensure settings persistence across application restarts
     - _Requirements: 3.1, 4.1_
 
-  - [ ] 7.2 Create Tauri commands for transcription settings
+  - [x] 7.2 Create Tauri commands for transcription settings
     - Implement commands for model selection and language configuration
     - Add commands for model download status and management
     - Create settings validation and error handling

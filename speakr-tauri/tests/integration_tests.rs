@@ -90,6 +90,8 @@ async fn create_test_settings_with_hotkey(hotkey: &str) -> (TempDir, PathBuf) {
         hot_key: hotkey.to_string(),
         model_size: "medium".to_string(),
         auto_launch: false,
+        language: None,
+        performance_mode: speakr_types::PerformanceMode::Balanced,
         audio_duration_secs: 10,
     };
 
