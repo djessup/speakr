@@ -56,3 +56,15 @@
   - [Phase 5](refactor/SPEAKR-TAURI_LIB-RS_PHASE_5.md)
     - [Migration Notes](refactor/MIGRATION_NOTES_PHASE_5.md)
 - [Rust Comment Improvement Tracking](refactor/RUST_DOCUMENTATION_TRACKING.md)
+
+# API Reference
+
+- [API Reference](api/README.md)
+  - [Shared Types (`speakr-types`)](api/speakr-types.md)
+  - [Core Library (`speakr-core`)](api/speakr-core.md)
+    - [Audio](api/core/audio.md)
+    - [Transcription Engine](api/core/transcription.md)
+    - [Model Management](api/core/model.md)
+    - [Pipeline](api/core/pipeline.md)
+  - [Tauri Backend (`speakr-tauri`)](api/speakr-tauri.md)
+  - [UI (`speakr-ui`)](api/speakr-ui.md)
